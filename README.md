@@ -19,3 +19,5 @@ npm test
 ```
 
 O workflow está em `.github/workflows/ci.yml`. Para o GitHub impedir merge com check vermelho, em **Settings → Branches** crie uma regra para `main` e marque **Require status checks to pass** com Lint, Typecheck e Test. Esses nomes só aparecem depois do primeiro workflow concluído.
+
+O corte da demo e as fronteiras entre a regra, o Next e o Nest estão em `docs/`. Papéis de sessão ficam em `.agents/` e os procedimentos em `.skills/`. O índice para o Cursor é `AGENTS.md`.
