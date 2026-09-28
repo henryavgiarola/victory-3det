@@ -8,9 +8,11 @@ A onda 3 foi validada no mesmo dia, sem editar `.github/workflows/ci.yml`. O `on
 
 A onda 4 foi fechada em 2026-09-27 sem criar infra. A API pública lista um workflow, `.github/workflows/ci.yml`, e zero environments. O YAML não cita `deploy`, `environment` nem `secrets`. Produção continua sendo o commit de `main`, não um servidor.
 
-A onda 5 foi fechada no mesmo dia sem cortar versão. `main` e `development` ainda são `37936f1`. Não há tag, `release/*` nem `hotfix/*`. O roteiro abaixo fica para quando `development` tiver commits que `main` não tem. A primeira versão será `release/0.1.0` e a tag `v0.1.0`, só depois do merge em `main`.
+A onda 5 foi fechada no mesmo dia sem cortar versão. Naquele momento `main` e `development` ainda eram `37936f1`. Não há tag, `release/*` nem `hotfix/*`. O roteiro abaixo fica para quando `development` tiver commits que `main` não tem. A primeira versão será `release/0.1.0` e a tag `v0.1.0`, só depois do merge em `main`.
 
-A onda 6 é o pull request https://github.com/henryavgiarola/victory-3det/pull/1 (`feature/prova-ci` → `development`), mergeado por squash. Lint, Typecheck e Test ficaram verdes. `main` permanece em `37936f1`. Nenhuma tag foi criada.
+A onda 6 é o pull request https://github.com/henryavgiarola/victory-3det/pull/1 (`feature/prova-ci` → `development`), mergeado por squash no commit `e7b34fb`. Lint, Typecheck e Test ficaram verdes. `main` permanece em `37936f1`. Nenhuma tag foi criada. A partir desse merge, `development` está à frente de `main`.
+
+A onda 7 atualiza a seção Pipeline do `README.md`: o fluxo `feature/*` → `development` → `release/*` → `main`, os três checks e o ponteiro para este arquivo. Sem descrever deploy.
 
 ## 1. Objetivo
 
@@ -446,7 +448,7 @@ Critérios de aceite:
 | 4 | CD | Produção | Sem job de deploy. YAML sem `environment` e sem `secrets` | Não criar job | `permissions: contents: read` | Sem artefato de build | Leitura do workflow | Concluído |
 | 5 | Release | Versionamento | Sem tag. `main` e `development` em `37936f1`. Roteiro de `release/0.1.0` e tag `v0.1.0` neste arquivo | Roteiro pronto; branch só quando houver delta | `docs/plano-acao-ci-cd.md` | Ondas 1 e 2 | `git tag -l` vazio e sem `release/` no remoto | Concluído |
 | 6 | Validação | Fluxo feature | PR 1 `feature/prova-ci` → `development`, squash. `main` em `37936f1`. Sem tag | PR com Lint, Typecheck e Test, sem tag | `docs/plano-acao-ci-cd.md` | Ondas 1–3 | Checks verdes no PR 1 | Concluído |
-| 7 | Documentação | README | Só ensina a proteger `main` | Cita o fluxo e este plano | `README.md` | Ondas 1 e 5 | Leitura da seção Pipeline | Não iniciado |
+| 7 | Documentação | README | Seção Pipeline cita `development`, `release/*`, `main` e este arquivo. Sem deploy | Cita o fluxo e este plano | `README.md` | Ondas 1 e 5 | Leitura da seção Pipeline | Concluído |
 
 ## 14. Estratégia de testes
 
@@ -532,10 +534,32 @@ A primeira `release/0.1.0` não está nessa lista. Ela espera `development` ter 
 
 ## 19. Pendências
 
-| Pendência | Por que não fechou nesta leitura |
-|-----------|----------------------------------|
-| A regra de `main` em Settings → Branches já foi criada depois do README? | Sim, via ruleset `main-ruleset`, não via branch protection clássica. O repositório está público. |
-| O SHA de `main` ainda é `37936f1` no dia da onda 1? | O plano fixa o SHA desta sessão. Um push posterior muda a origem de `development`. |
-| Ruleset da organização GitHub por cima do repositório | Não há arquivo no repo que prove ou negue regra herdada. |
-| Quando cortar `v0.1.0` | Depende do app da demo existir em `development`, não desta migração de branches. |
-| Reabrir `hotfix/*` | Só se surgir deploy de produção que não possa esperar `release/*`. Hoje esse deploy não existe. |
+| Pendência | Estado |
+|-----------|--------|
+| Regra de `main` | Feita. Ruleset `main-ruleset` na branch padrão. O repositório está público. |
+| SHA da onda 1 | `development` nasceu em `37936f1`, igual a `main`. Depois do PR 1, `development` é `e7b34fb` e `main` continua `37936f1`. |
+| Ruleset da organização | Não há arquivo no repo que prove ou negue regra herdada. |
+| Tag `v0.1.0` | Ainda não. `development` já tem um commit que `main` não tem (este plano). A tag continua esperando o app da demo, não só a documentação. |
+| `hotfix/*` | Fora do fluxo. Só faria sentido com deploy de produção. |
+| Rulesets extras | `merge ruleset`, `pr-merge-ruleset-1` e `pr-merge-ruleset-2` seguem ativos e não apontam para `development` nem `main`. |
+| Origem do PR em `main` | O ruleset não impede um pull request que não venha de `release/*`. A disciplina fica no roteiro da onda 5. |
+
+## 20. Registro da execução
+
+| Onda | Passos feitos | Resultado |
+|------|----------------|-----------|
+| 0 | Leitura de `main`, do workflow e dos scripts | Só `main`, em `37936f1`. Três jobs. Sem tag, sem deploy |
+| 1 | `development` criada nesse SHA e publicada | `origin/main` e `origin/development` iguais. Sem `release/*` |
+| 2 | Repositório tornado público. Rulesets `development-ruleset`, `main-ruleset` e `release-ruleset` | PR obrigatório, três checks, force push bloqueado, sem segundo revisor. Admin com bypass |
+| 3 | Workflow lido de novo. Run `36368240071` em `development` e `36279209059` em `main` | YAML sem diff. Lint, Typecheck e Test verdes. Sem build e sem deploy |
+| 4 | API pública de workflows e environments | Um workflow. Zero environments |
+| 5 | Conferência de tags e branches. Roteiro deixado na seção da onda 5 | Nenhuma `release/0.1.0` criada, porque naquele momento não havia delta |
+| 6 | Branch `feature/prova-ci`, PR 1 para `development`, checks verdes, squash | `development` em `e7b34fb`. `main` em `37936f1`. Sem tag |
+| 7 | README passa a descrever o fluxo e aponta para este arquivo | Sem job de deploy no texto. Comandos `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` |
+
+O que esta migração não fez, de propósito ou ainda em aberto:
+
+- Não criou `release/0.1.0`, tag `v0.1.0` nem `hotfix/*`.
+- Não criou build, deploy, environment nem secret.
+- Não provou um pull request de `release/*` para `main`. Isso espera a primeira versão.
+- Não removeu os três rulesets extras.
