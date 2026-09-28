@@ -10,7 +10,7 @@ A onda 4 foi fechada em 2026-09-27 sem criar infra. A API pública lista um work
 
 A onda 5 foi fechada no mesmo dia sem cortar versão. `main` e `development` ainda são `37936f1`. Não há tag, `release/*` nem `hotfix/*`. O roteiro abaixo fica para quando `development` tiver commits que `main` não tem. A primeira versão será `release/0.1.0` e a tag `v0.1.0`, só depois do merge em `main`.
 
-A onda 6 abre o pull request `feature/prova-ci` → `development`. O conteúdo é este plano. Não entra em `main` e não cria tag.
+A onda 6 é o pull request https://github.com/henryavgiarola/victory-3det/pull/1 (`feature/prova-ci` → `development`), mergeado por squash. Lint, Typecheck e Test ficaram verdes. `main` permanece em `37936f1`. Nenhuma tag foi criada.
 
 ## 1. Objetivo
 
@@ -445,7 +445,7 @@ Critérios de aceite:
 | 4 | CD | Staging | Sem homologação no Actions | Não criar | — | Sem infra | Ausente | Concluído |
 | 4 | CD | Produção | Sem job de deploy. YAML sem `environment` e sem `secrets` | Não criar job | `permissions: contents: read` | Sem artefato de build | Leitura do workflow | Concluído |
 | 5 | Release | Versionamento | Sem tag. `main` e `development` em `37936f1`. Roteiro de `release/0.1.0` e tag `v0.1.0` neste arquivo | Roteiro pronto; branch só quando houver delta | `docs/plano-acao-ci-cd.md` | Ondas 1 e 2 | `git tag -l` vazio e sem `release/` no remoto | Concluído |
-| 6 | Validação | Fluxo feature | PR `feature/prova-ci` → `development`, squash. `main` permanece em `37936f1` | PR com Lint, Typecheck e Test, sem tag | `docs/plano-acao-ci-cd.md` | Ondas 1–3 | Checks do PR | Em validação |
+| 6 | Validação | Fluxo feature | PR 1 `feature/prova-ci` → `development`, squash. `main` em `37936f1`. Sem tag | PR com Lint, Typecheck e Test, sem tag | `docs/plano-acao-ci-cd.md` | Ondas 1–3 | Checks verdes no PR 1 | Concluído |
 | 7 | Documentação | README | Só ensina a proteger `main` | Cita o fluxo e este plano | `README.md` | Ondas 1 e 5 | Leitura da seção Pipeline | Não iniciado |
 
 ## 14. Estratégia de testes
