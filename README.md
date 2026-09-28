@@ -18,6 +18,10 @@ npm run typecheck
 npm test
 ```
 
-O workflow está em `.github/workflows/ci.yml`. Para o GitHub impedir merge com check vermelho, em **Settings → Branches** crie uma regra para `main` e marque **Require status checks to pass** com Lint, Typecheck e Test. Esses nomes só aparecem depois do primeiro workflow concluído.
+O workflow está em `.github/workflows/ci.yml`. Não há job de build nem de deploy.
+
+`feature/*` e `fix/*` entram em `development` por squash. `release/x.y.z` nasce de `development` quando houver uma versão para publicar e entra em `main` por merge commit. A tag é manual, depois desse merge. `main` é a branch padrão.
+
+Lint, Typecheck e Test são obrigatórios no pull request para `development`, `release/*` e `main`. O detalhe da migração está em `docs/plano-acao-ci-cd.md`.
 
 O corte da demo e as fronteiras entre a regra, o Next e o Nest estão em `docs/`. Papéis de sessão ficam em `.agents/` e os procedimentos em `.skills/`. O índice para o Cursor é `AGENTS.md`.
