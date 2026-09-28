@@ -14,6 +14,8 @@ A onda 6 é o pull request https://github.com/henryavgiarola/victory-3det/pull/1
 
 A onda 7 atualiza a seção Pipeline do `README.md`: o fluxo `feature/*` → `development` → `release/*` → `main`, os três checks e o ponteiro para este arquivo. Sem descrever deploy.
 
+A release `0.1.0` entrou em `main` pelo pull request https://github.com/henryavgiarola/victory-3det/pull/3, merge commit `7b44671`, tag anotada `v0.1.0`. O pull request https://github.com/henryavgiarola/victory-3det/pull/4 devolveu esse merge para `development` (`1446379`). A branch `release/0.1.0` foi apagada no merge. A tag marca o baseline de branches e CI, não o app Next/Nest. Os rulesets `merge ruleset`, `pr-merge-ruleset-1` e `pr-merge-ruleset-2` foram removidos.
+
 ## 1. Objetivo
 
 Separar integração e produção no GitHub sem trocar a pipeline que já roda lint, typecheck e teste. `main` continua sendo o que o remoto trata como padrão. `development` passa a receber `feature/*` e `fix/*`. `release/*` só nasce quando houver uma versão candidata a entrar em `main`.
@@ -539,9 +541,9 @@ A primeira `release/0.1.0` não está nessa lista. Ela espera `development` ter 
 | Regra de `main` | Feita. Ruleset `main-ruleset` na branch padrão. O repositório está público. |
 | SHA da onda 1 | `development` nasceu em `37936f1`, igual a `main`. Depois do PR 1, `development` é `e7b34fb` e `main` continua `37936f1`. |
 | Ruleset da organização | Não há arquivo no repo que prove ou negue regra herdada. |
-| Tag `v0.1.0` | Ainda não. `development` já tem um commit que `main` não tem (este plano). A tag continua esperando o app da demo, não só a documentação. |
+| Tag `v0.1.0` | Feita. Aponta para o merge `7b44671` em `main`. É o baseline de branches e CI. A próxima tag espera o app da demo. |
 | `hotfix/*` | Fora do fluxo. Só faria sentido com deploy de produção. |
-| Rulesets extras | `merge ruleset`, `pr-merge-ruleset-1` e `pr-merge-ruleset-2` seguem ativos e não apontam para `development` nem `main`. |
+| Rulesets extras | Removidos: `merge ruleset`, `pr-merge-ruleset-1` e `pr-merge-ruleset-2`. |
 | Origem do PR em `main` | O ruleset não impede um pull request que não venha de `release/*`. A disciplina fica no roteiro da onda 5. |
 
 ## 20. Registro da execução
@@ -555,11 +557,11 @@ A primeira `release/0.1.0` não está nessa lista. Ela espera `development` ter 
 | 4 | API pública de workflows e environments | Um workflow. Zero environments |
 | 5 | Conferência de tags e branches. Roteiro deixado na seção da onda 5 | Nenhuma `release/0.1.0` criada, porque naquele momento não havia delta |
 | 6 | Branch `feature/prova-ci`, PR 1 para `development`, checks verdes, squash | `development` em `e7b34fb`. `main` em `37936f1`. Sem tag |
-| 7 | README passa a descrever o fluxo e aponta para este arquivo | Sem job de deploy no texto. Comandos `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` |
+| 7 | README passa a descrever o fluxo e aponta para este arquivo | Sem job de deploy no texto. Comandos `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`. PR 2, squash `d616311` |
+| Release | `release/0.1.0` a partir de `development`, PR 3 para `main`, tag `v0.1.0`, PR 4 de volta | `main` em `7b44671`. `development` em `1446379`. Branch da release apagada. Rulesets extras removidos |
 
-O que esta migração não fez, de propósito ou ainda em aberto:
+O que permanece de fora:
 
-- Não criou `release/0.1.0`, tag `v0.1.0` nem `hotfix/*`.
-- Não criou build, deploy, environment nem secret.
-- Não provou um pull request de `release/*` para `main`. Isso espera a primeira versão.
-- Não removeu os três rulesets extras.
+- `hotfix/*`, build, deploy, environment e secret. Não há app publicado nem script `npm run build`.
+- O ruleset de `main` não filtra a branch de origem do pull request. O caminho continua sendo `release/*`.
+- A tag seguinte espera o app Next/Nest. `v0.1.0` não é essa versão.
