@@ -2,7 +2,8 @@
   "name": "victory-3det",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "lint": "eslint .",
