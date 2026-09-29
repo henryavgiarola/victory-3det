@@ -615,6 +615,65 @@ O projeto deixa de ser apenas uma aplicação em desenvolvimento e passa a possu
 
 ---
 
+# Dia 3 — Segunda, 28/09/2026
+
+## Primeira onda funcional: lista pública na API
+
+O terceiro dia foi a primeira implementação de produto depois do planejamento e do fluxo de branches. O alvo foi a onda 1 de `docs/plano-acao-implementacao.md`: a API passa a expor a lista pública de fichas aprovadas, lendo Postgres e calculando os pontos de exibição com `validarFicha`.
+
+A alteração foi feita na branch `feature/lista-publica` e entrou em `development` por squash. `main` não foi movida. O fluxo definido no dia anterior permanece: `main` só recebe uma release.
+
+---
+
+# 1. Contrato de `GET /fichas-publicas`
+
+`apps/*` passou a fazer parte dos workspaces. Foi criado `apps/api`, pacote `@victory/api`, com NestJS. O endpoint não exige autenticação. A resposta é um array JSON com `nome`, `conceito`, `poder`, `habilidade`, `resistencia`, `pa`, `pm` e `pv`. A consulta filtra `status = aprovada` e ordena por nome.
+
+`pa`, `pm` e `pv` não são gravados. Saem de `validarFicha`: PA é o Poder, PM é a Habilidade vezes cinco e PV é a Resistência vezes cinco. Nome e conceito são colunas da inscrição, porque não existem no tipo `Ficha`.
+
+Se uma linha já marcada como aprovada não passa na validação, ela fica de fora da lista e o repositório registra um aviso. A matemática continua só em `packages/rules`. O pacote ganhou compilação (`build`, `main` e `src/index.ts`) para a API importar o JavaScript gerado. O typecheck da API compila as regras antes de checar o Nest. Os sete testes de `validarFicha` não foram movidos.
+
+---
+
+# 2. Tabela, cliente SQL e sementes
+
+O acesso ao banco ficou em `InscricoesRepository`, com o cliente `pg`. Não foi adotado um segundo ORM. `DATABASE_URL` é obrigatória. Na subida, a API tenta a conexão quinze vezes, com um segundo entre as tentativas, cria a tabela `inscricoes` se ela não existir e semeia.
+
+A tabela já nasce com as colunas previstas para as ondas seguintes: `id`, `nome`, `conceito`, `ficha` em JSON, `status`, `sub`, `correlation_id` e `motivos`. No seed, `sub` e o correlation id ficam nulos.
+
+As duas linhas entram como `aprovada`. O insert usa `ON CONFLICT (id) DO NOTHING`. Uma semente que `validarFicha` recusa interrompe a subida.
+
+* **Lívia do Cais** — Estivadora que briga com gancho e blefe. Poder 2, Habilidade 2, Resistência 2, Luta, Manha, Forte e Ataque Especial Preciso. A exibição fica PA 2, PM 10 e PV 10.
+* **Nuno do Farol** — Guia do porto que lê o tempo e convence a tripulação. Poder 1, Habilidade 2, Resistência 2, Influência, Percepção, Medicina, Carismático e Ágil. A exibição fica PA 1, PM 10 e PV 10.
+
+Os nomes e os conceitos são originais. Isso fecha, no código, a pendência da segunda ficha que o plano deixava em aberto. O arquivo do plano não foi reescrito neste dia.
+
+---
+
+# 3. Compose e a porta do Postgres
+
+O `docker-compose.yml` sobe Postgres 16 e a API. O banco tem healthcheck com `pg_isready`. A API só inicia depois que o Postgres está saudável e publica a porta 3000. O Dockerfile usa Node 22, instala as dependências na raiz do monorepo e compila `@victory/rules` e `@victory/api`.
+
+A primeira subida tentou publicar a porta 5432 do Postgres no host e falhou, porque essa porta já estava ocupada. A correção foi não publicar a porta do banco. A API alcança o Postgres pelo nome `postgres` na rede do Compose. O `.env.example` registra `DATABASE_URL` e `PORT` para uso local. O `.env` continua fora do Git.
+
+Com a stack no ar, `GET /fichas-publicas` respondeu 200 com as duas fichas.
+
+---
+
+# 4. O que esta onda não fez
+
+Não houve frontend, login, `POST /inscricoes`, Redis, worker nem correlation id na resposta. O workflow de CI não mudou: continuam Lint, Typecheck e Test, sem job de build ou de deploy. A raiz ainda não tem script `build`.
+
+A lista pública está em `development`. `main` segue com a documentação dos dois primeiros dias até a próxima release.
+
+---
+
+# 5. Próximo passo
+
+A onda 2 do plano é a home em Next.js: Server Component na rota `/`, lendo este endpoint, com nome, conceito, atributos e PA, PM e PV. O Compose ainda não inclui o serviço web.
+
+---
+
 # Referências utilizadas
 
 As decisões deste documento foram baseadas principalmente na documentação oficial das tecnologias utilizadas e na documentação oficial do GitHub.

@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: victory
+      POSTGRES_PASSWORD: victory
+      POSTGRES_DB: victory
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U victory -d victory"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgres://victory:victory@postgres:5432/victory
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
