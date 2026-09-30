@@ -6,6 +6,31 @@ import { InscricoesRepository } from "./inscricoes.repository";
 
 const ATRASO_MS = 1000;
 
+type Gravacao = Pick<InscricoesRepository, "buscar" | "marcarProcessamento" | "concluir">;
+
+export async function processarValidacao(
+  id: string,
+  inscricoes: Gravacao,
+  pausar: () => Promise<void> = async () => undefined,
+): Promise<{ correlationId: string; status: "aprovada" | "recusada" } | undefined> {
+  if (!id) {
+    return undefined;
+  }
+  const linha = await inscricoes.buscar(id);
+  if (!linha?.correlationId) {
+    return undefined;
+  }
+  await inscricoes.marcarProcessamento(id);
+  await pausar();
+  const calculo = validarFicha(linha.ficha);
+  if (calculo.ok) {
+    await inscricoes.concluir(id, "aprovada", []);
+    return { correlationId: linha.correlationId, status: "aprovada" };
+  }
+  await inscricoes.concluir(id, "recusada", calculo.motivos);
+  return { correlationId: linha.correlationId, status: "recusada" };
+}
+
 @Injectable()
 export class WorkerValidacao implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WorkerValidacao.name);
@@ -18,22 +43,15 @@ export class WorkerValidacao implements OnModuleInit, OnModuleDestroy {
       "validar-ficha",
       async (job) => {
         const id = typeof job.data?.id === "string" ? job.data.id : "";
-        const linha = id ? await this.inscricoes.buscar(id) : undefined;
-        if (!linha?.correlationId) {
+        const resultado = await processarValidacao(id, this.inscricoes, async () => {
+          if (process.env.NODE_ENV !== "production") {
+            await new Promise((resolver) => setTimeout(resolver, ATRASO_MS));
+          }
+        });
+        if (!resultado) {
           return;
         }
-        await this.inscricoes.marcarProcessamento(id);
-        if (process.env.NODE_ENV !== "production") {
-          await new Promise((resolver) => setTimeout(resolver, ATRASO_MS));
-        }
-        const calculo = validarFicha(linha.ficha);
-        if (calculo.ok) {
-          await this.inscricoes.concluir(id, "aprovada", []);
-          this.logger.log(`correlationId=${linha.correlationId} id=${id} status=aprovada`);
-          return;
-        }
-        await this.inscricoes.concluir(id, "recusada", calculo.motivos);
-        this.logger.log(`correlationId=${linha.correlationId} id=${id} status=recusada`);
+        this.logger.log(`correlationId=${resultado.correlationId} id=${id} status=${resultado.status}`);
       },
       { connection: conexaoRedis() },
     );
