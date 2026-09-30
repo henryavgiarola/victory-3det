@@ -1,0 +1,37 @@
+body {
+  margin: 0;
+  font-family: sans-serif;
+  background: #fff;
+  color: #111;
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  border-top: 1px solid #ccc;
+  padding: 1rem 0;
+}
+
+label {
+  display: block;
+  margin: 0.4rem 0;
+}
+
+fieldset {
+  margin: 1rem 0;
+}
+
+input,
+select,
+button {
+  margin-left: 0.4rem;
+}
