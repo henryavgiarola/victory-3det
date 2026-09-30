@@ -788,3 +788,91 @@ Referência para a utilização dos status checks como requisito para integraç�
 * Compose com Next, Nest, Postgres, Redis e Keycloak.
 
 **Próxima etapa:** release quando houver uma versão para publicar. `main` ainda não inclui o app Next.
+
+---
+
+# Dia 4 — Terça, 29/09/2026
+
+## Ondas 2 a 6: da home ao ensaio da demo
+
+O quarto dia executou o restante do plano de implementação. A release `v0.2.0`, do dia anterior, ficou em `main` só com a lista pública da API. As ondas seguintes entraram em `development` por squash, cada uma numa `feature/*`, com Lint, Typecheck e Test verdes. `main` não foi movida. O workflow em `.github/workflows/ci.yml` não ganhou job de build nem de deploy.
+
+---
+
+# 1. Home pública
+
+A onda 2 saiu de `feature/home-publica` no pull request https://github.com/henryavgiarola/victory-3det/pull/12, squash `5b280f1`.
+
+`apps/web` é o pacote `@victory/web`, Next.js com App Router. A rota `/` é um Server Component. Ela lê `GET /fichas-publicas` no servidor, sem cache, e mostra nome, conceito, P/H/R e PA, PM e PV. Se a API não responde, a página falha em vez de renderizar uma lista vazia. O link "Nova ficha" aponta para `/fichas/nova`.
+
+O Compose passou a incluir o serviço web na porta 3001. O Dockerfile compila `@victory/rules` antes do Next. A primeira leitura no browser ficou ilegível porque o texto não tinha cor sobre o fundo escuro. `globals.css` passou a fixar fundo `#fff` e texto `#111`.
+
+O typecheck do app corrigiu o import de `auth` nas rotas de sessão: o caminho relativo precisava de um nível a mais. O pacote de regras passou a exportar `PERICIAS` e os tipos da ficha, para o formulário não copiar essas uniões.
+
+---
+
+# 2. Login e inscrição
+
+A onda 3 saiu de `feature/login-inscricao` no pull request https://github.com/henryavgiarola/victory-3det/pull/13, squash `f569c3a`.
+
+O Compose ganhou Redis e Keycloak 26. O realm `victory` importa de `apps/keycloak/victory-realm.json`. O client `victory-web` é público, com PKCE S256 e redirect em `http://localhost:3001/api/sessao/callback`. O usuário da demo é `jogador`.
+
+O browser autoriza em `localhost:8080`. A troca do code, dentro do container, usa o host interno `keycloak`. O callback grava só o access token no cookie httpOnly `sessao`. O Nest não guarda sessão. O guard confere o JWT na JWKS, com emissor, audiência e expiração. Token ausente, inválido ou de outra audiência responde 401, sem segredo no corpo. O client `outro`, com audiência `outro`, serviu para essa prova.
+
+`POST /inscricoes` exige Bearer. O corpo é a `Ficha` mais nome e conceito. O `sub` vem do token. A linha nasce `submetida` e a fila `validar-ficha` recebe o job `{ id }`. Se a publicação falha, a linha é apagada e a API responde 500. `/fichas/nova` redireciona para o login quando o cookie não existe. O formulário chama `validarFicha` para os pontos restantes e ainda permite enviar uma ficha ilegal, para a onda seguinte recusá-la.
+
+O primeiro password grant respondeu que a conta não estava pronta. O realm passou a ter nome, sobrenome e `requiredActions` vazio. Sem isso o Keycloak não emitia o token.
+
+A prova manual: sem cookie, `/fichas/nova` responde 307 para o login; com `jogador`, o formulário abre; o POST grava `submetida`; a lista pública continua só com as sementes aprovadas.
+
+---
+
+# 3. Worker, status e correlation id
+
+A onda 4 saiu de `feature/worker-status` no pull request https://github.com/henryavgiarola/victory-3det/pull/14, squash `f013eb4`.
+
+Antes do controller de leitura e da página, o plano fechou o que a seção 12 deixava em aberto: o header é `x-correlation-id`; a leitura é `GET /inscricoes/:id`, filtrada pelo `sub` do token; id ausente ou de outro dono responde 404; a página é `/fichas/:id`.
+
+O worker vive no mesmo processo Nest e consome a fila `validar-ficha`. Ele chama `validarFicha`. Não recalcula o pool. A linha passa de `submetida` para `em_processamento` e depois para `aprovada` ou `recusada`. Os motivos da recusa são os de `ResultadoFicha`. Fora de produção há uma pausa de um segundo depois de marcar `em_processamento`, para a tela conseguir mostrar esse estado. O Compose não define `NODE_ENV=production`, então a pausa vale na demo.
+
+O POST gera o correlation id, grava na coluna, escreve no log e devolve no header. O worker registra o mesmo id. O log não leva o token. O BFF do Next repassa o header. A página consulta `/api/inscricoes/:id` enquanto o status é `submetida` ou `em_processamento`.
+
+O realm ganhou o usuário `visitante` e o client `leitura`, com audiência `victory-web`, para provar que outro `sub` não lê a inscrição. O client `outro` continuou com audiência `outro`.
+
+Na prova manual, Ágil com Atrapalhado passou por `em_processamento` e terminou `recusada` com o motivo `Ágil e Atrapalhado não podem estar na mesma ficha.` Uma ficha válida terminou `aprovada` e apareceu na home. O visitante recebeu 404. A chamada sem token recebeu 401. O header e o log do worker tinham o mesmo id, sem JWT. No browser, a ficha Mira do Cais abriu `/fichas/:id` como `recusada`, com esse motivo e o correlation id. A home seguiu só com as aprovadas.
+
+---
+
+# 4. Teste do caso de uso
+
+A onda 5 saiu de `feature/teste-caso-de-uso` no pull request https://github.com/henryavgiarola/victory-3det/pull/15, squash `2f05f3b`.
+
+O processamento da inscrição foi extraído para `processarValidacao`, no mesmo arquivo do worker. O teste chama essa função com repositório e fila falsos. Não sobe Postgres, Redis nem Keycloak. A pausa de um segundo continua só no worker, passada como callback, para o Jest não esperar relógio.
+
+Os cinco cenários gravam o status a partir de `validarFicha`: ficha dentro do pool fica `aprovada`; Ágil com Atrapalhado, onze pontos sem desvantagem e a terceira desvantagem ficam `recusada` com o motivo da regra; duas desvantagens e o ponto extra ficam `aprovada`. Os sete testes de `packages/rules` continuam no spec puro. `@victory/api` ganhou o script `test`. O `npm test` da raiz passou a executá-lo pelo fan-out dos workspaces.
+
+O primeiro Test da CI falhou com `Cannot find module '@victory/rules'`. O job de teste não gera `dist`, e o Jest resolvia o pacote por esse arquivo. O script de teste da API passou a compilar as regras antes do Jest. A segunda execução ficou verde. O workflow não foi editado.
+
+---
+
+# 5. Documentação da demo
+
+A onda 6 saiu de `feature/doc-demo` no pull request https://github.com/henryavgiarola/victory-3det/pull/16, squash `fb6b1b6`.
+
+A seção Demo, no início deste README, descreve o caminho browser, Next com sessão, Nest com JWKS, Postgres, Redis e worker, e os quatro passos do ensaio: lista, login, inscrição e status. Os três checks continuam os da pipeline. Rolagem, combate, PDF e mobile ficam de fora.
+
+Em `docs/01-mapa-arquitetura.md`, a seção "No repositório" passou a listar `packages/rules`, `apps/web`, `apps/api`, o realm e o Compose. As árvores `frontend/` e `backend/` permanecem como modelo de organização. Não são diretórios a criar ao lado de `apps/`.
+
+---
+
+# 6. Leitura do que o plano ainda marcava em aberto
+
+Depois das seis ondas, a seção 10 de `docs/plano-acao-implementacao.md` está coberta em `development` (`fb6b1b6`). `main` continua em `c696a8d`, a tag `v0.2.0`, e está contida em `development`. O quadro da seção 7 desse plano ainda diz "Não iniciado", e a seção 12 ainda abre dizendo que nenhuma pendência foi resolvida. No código, as sementes, o cliente `pg`, o header e `GET /inscricoes/:id` já estão fechados. O ajuste de ESLint para TSX não entrou: o lint passou sem ele.
+
+Nesta mesma noite, `apps/web/tsconfig.json` perdeu a opção `baseUrl`. Ela valia `"."` e nenhum import do app dependia dela. O TypeScript 6 a trata como obsoleta. O typecheck de `@victory/web` passou, e o `tsc` 6.0.2 aceitou o arquivo. A alteração entra neste incremento.
+
+---
+
+# 7. Próximo passo
+
+Não há onda de produto pendente no plano. O que falta para a demo estar em `main` é uma release a partir de `development`, no fluxo já usado: `release/x.y.z`, merge commit em `main`, tag anotada e a volta para `development`.
