@@ -13,6 +13,23 @@ export interface FichaPublica {
   pv: number;
 }
 
+export interface Inscricao {
+  id: string;
+  nome: string;
+  conceito: string;
+  ficha: Ficha;
+  status: string;
+  sub: string | null;
+  correlationId: string | null;
+  motivos: string[];
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function uuid(id: string): boolean {
+  return UUID.test(id);
+}
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS inscricoes (
   id uuid PRIMARY KEY,
@@ -110,14 +127,55 @@ export class InscricoesRepository implements OnModuleInit, OnModuleDestroy {
     return publicas;
   }
 
-  async inserir(entrada: { nome: string; conceito: string; ficha: Ficha; sub: string }): Promise<string> {
+  async inserir(entrada: {
+    nome: string;
+    conceito: string;
+    ficha: Ficha;
+    sub: string;
+    correlationId: string;
+  }): Promise<string> {
     const id = crypto.randomUUID();
     await this.conexao().query(
       `INSERT INTO inscricoes (id, nome, conceito, ficha, status, sub, correlation_id, motivos)
-       VALUES ($1, $2, $3, $4::jsonb, 'submetida', $5, NULL, '[]'::jsonb)`,
-      [id, entrada.nome, entrada.conceito, JSON.stringify(entrada.ficha), entrada.sub],
+       VALUES ($1, $2, $3, $4::jsonb, 'submetida', $5, $6, '[]'::jsonb)`,
+      [id, entrada.nome, entrada.conceito, JSON.stringify(entrada.ficha), entrada.sub, entrada.correlationId],
     );
     return id;
+  }
+
+  async buscar(id: string): Promise<Inscricao | undefined> {
+    if (!uuid(id)) {
+      return undefined;
+    }
+    const resultado = await this.conexao().query<Inscricao>(
+      `SELECT id, nome, conceito, ficha, status, sub, correlation_id AS "correlationId", motivos
+       FROM inscricoes WHERE id = $1`,
+      [id],
+    );
+    return resultado.rows[0];
+  }
+
+  async buscarDoDono(id: string, sub: string): Promise<Inscricao | undefined> {
+    const linha = await this.buscar(id);
+    if (!linha || linha.sub !== sub) {
+      return undefined;
+    }
+    return linha;
+  }
+
+  async marcarProcessamento(id: string): Promise<void> {
+    await this.conexao().query(
+      "UPDATE inscricoes SET status = 'em_processamento' WHERE id = $1 AND status = 'submetida'",
+      [id],
+    );
+  }
+
+  async concluir(id: string, status: "aprovada" | "recusada", motivos: string[]): Promise<void> {
+    await this.conexao().query(
+      `UPDATE inscricoes SET status = $2, motivos = $3::jsonb
+       WHERE id = $1 AND status IN ('submetida', 'em_processamento')`,
+      [id, status, JSON.stringify(motivos)],
+    );
   }
 
   async remover(id: string): Promise<void> {

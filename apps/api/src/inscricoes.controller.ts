@@ -2,10 +2,15 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   HttpCode,
   InternalServerErrorException,
+  Logger,
+  NotFoundException,
+  Param,
   Post,
   Req,
+  Res,
   UseGuards,
 } from "@nestjs/common";
 import type { Ficha } from "@victory/rules";
@@ -17,8 +22,14 @@ interface RequisicaoAutenticada {
   usuario?: { sub: string };
 }
 
+interface Cabecalho {
+  setHeader(nome: string, valor: string): void;
+}
+
 @Controller()
 export class InscricoesController {
+  private readonly logger = new Logger(InscricoesController.name);
+
   constructor(
     private readonly inscricoes: InscricoesRepository,
     private readonly fila: FilaValidacao,
@@ -27,7 +38,11 @@ export class InscricoesController {
   @Post("inscricoes")
   @UseGuards(JwtGuard)
   @HttpCode(201)
-  async criar(@Body() corpo: Record<string, unknown>, @Req() requisicao: RequisicaoAutenticada) {
+  async criar(
+    @Body() corpo: Record<string, unknown>,
+    @Req() requisicao: RequisicaoAutenticada,
+    @Res({ passthrough: true }) resposta: Cabecalho,
+  ) {
     const sub = requisicao.usuario?.sub;
     if (!sub) {
       throw new BadRequestException();
@@ -39,14 +54,43 @@ export class InscricoesController {
       throw new BadRequestException();
     }
 
-    const id = await this.inscricoes.inserir({ nome, conceito, ficha, sub });
+    const correlationId = crypto.randomUUID();
+    const id = await this.inscricoes.inserir({ nome, conceito, ficha, sub, correlationId });
     try {
       await this.fila.publicar(id);
     } catch {
       await this.inscricoes.remover(id);
       throw new InternalServerErrorException();
     }
+    resposta.setHeader("x-correlation-id", correlationId);
+    this.logger.log(`correlationId=${correlationId} id=${id} status=submetida`);
     return { id, status: "submetida" as const };
+  }
+
+  @Get("inscricoes/:id")
+  @UseGuards(JwtGuard)
+  async ler(
+    @Param("id") id: string,
+    @Req() requisicao: RequisicaoAutenticada,
+    @Res({ passthrough: true }) resposta: Cabecalho,
+  ) {
+    const sub = requisicao.usuario?.sub;
+    if (!sub) {
+      throw new NotFoundException();
+    }
+    const linha = await this.inscricoes.buscarDoDono(id, sub);
+    if (!linha?.correlationId) {
+      throw new NotFoundException();
+    }
+    resposta.setHeader("x-correlation-id", linha.correlationId);
+    return {
+      id: linha.id,
+      nome: linha.nome,
+      conceito: linha.conceito,
+      status: linha.status,
+      motivos: linha.motivos,
+      correlationId: linha.correlationId,
+    };
   }
 }
 

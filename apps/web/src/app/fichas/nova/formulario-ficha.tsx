@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import {
   PERICIAS,
@@ -57,6 +58,7 @@ export function FormularioFicha() {
   const [codigo, setCodigo] = useState(false);
   const [qualCodigo, setQualCodigo] = useState<Codigo>("cacador");
   const [resposta, setResposta] = useState("");
+  const router = useRouter();
 
   const ficha = useMemo<Ficha>(() => {
     const vantagens: Vantagem[] = simples.map((tipo) => ({ tipo }) as Vantagem);
@@ -107,7 +109,12 @@ export function FormularioFicha() {
       body: JSON.stringify({ nome, conceito, ...ficha }),
     });
     const texto = await http.text();
-    setResposta(http.ok ? texto : `Erro ${http.status}`);
+    if (!http.ok) {
+      setResposta(`Erro ${http.status}`);
+      return;
+    }
+    const json = JSON.parse(texto) as { id: string };
+    router.push(`/fichas/${json.id}`);
   }
 
   function alternar<T extends string>(atual: T[], valor: T, marcar: boolean): T[] {
