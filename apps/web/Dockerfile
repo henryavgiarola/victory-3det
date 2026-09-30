@@ -5,7 +5,8 @@ COPY packages/rules/package.json packages/rules/package.json
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 RUN npm ci
+COPY packages/rules packages/rules
 COPY apps/web apps/web
-RUN npm run build -w @victory/web
+RUN npm run build -w @victory/rules && npm run build -w @victory/web
 EXPOSE 3001
 CMD ["npm", "run", "start", "-w", "@victory/web"]
