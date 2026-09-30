@@ -53,6 +53,27 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "leitura",
+      "name": "leitura",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "audience-leitura",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "victory-web",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "users": [
@@ -68,6 +89,22 @@
         {
           "type": "password",
           "value": "jogador",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "visitante",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Visitante",
+      "lastName": "Demo",
+      "email": "visitante@example.com",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "visitante",
           "temporary": false
         }
       ]

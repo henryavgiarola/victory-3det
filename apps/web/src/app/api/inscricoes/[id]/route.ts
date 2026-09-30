@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
-export async function POST(requisicao: Request) {
+export async function GET(_requisicao: Request, contexto: { params: Promise<{ id: string }> }) {
+  const { id } = await contexto.params;
   const jar = await cookies();
   const token = jar.get("sessao")?.value;
   const api = process.env.API_URL;
@@ -8,13 +9,8 @@ export async function POST(requisicao: Request) {
     return new Response(null, { status: 401 });
   }
 
-  const resposta = await fetch(new URL("/inscricoes", api), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${token}`,
-    },
-    body: await requisicao.text(),
+  const resposta = await fetch(new URL(`/inscricoes/${id}`, api), {
+    headers: { authorization: `Bearer ${token}` },
   });
   const headers = new Headers();
   headers.set("content-type", resposta.headers.get("content-type") ?? "application/json");

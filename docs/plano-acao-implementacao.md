@@ -93,7 +93,7 @@ A criar em `apps/api`:
 - `POST /inscricoes` com JWT conferido na JWKS (emissor, audiência, expiração), como em `docs/03-definition-of-done.md`.
 - Publicação do job `validar-ficha` e worker que chama `validarFicha` de `@victory/rules`.
 - Log com o mesmo correlation id.
-- Leitura da inscrição do dono, path em aberto (D15).
+- `GET /inscricoes/:id` com o mesmo JWT. Só a linha cujo `sub` é o do token. Ausente ou de outro dono: 404. Página `/fichas/:id`.
 
 A regra não muda de arquivo. O Nest depende de `@victory/rules`; `packages/rules` não depende do Nest.
 
@@ -120,9 +120,19 @@ Não há chamada HTTP no código. O contrato abaixo é decisão deste plano, ali
 | Auth | `Authorization: Bearer`. Cookie de sessão não é enviado ao Nest |
 | Body | Campos de `Ficha` mais `nome` e `conceito` (D4) |
 | Sucesso | 201, corpo com `id` e `status: "submetida"` |
-| Header | Correlation id (nome do header na seção 12) |
+| Header | `x-correlation-id`, o mesmo valor da coluna, do log e da página |
 | Token inválido, expirado ou de outro client | 401, sem corpo com segredo |
 | Dono | `sub` do token, não um campo do body |
+
+`GET /inscricoes/:id`
+
+| Item | Valor |
+|------|--------|
+| Auth | `Authorization: Bearer`. Cookie de sessão não é enviado ao Nest |
+| Sucesso | 200, `id`, `nome`, `conceito`, `status`, `motivos`, `correlationId` |
+| Header | `x-correlation-id`, igual a `correlationId` e ao log do worker |
+| Ausente ou `sub` de outro dono | 404 |
+| Página | `/fichas/:id` |
 
 Status persistido: `submetida`, `em_processamento`, `aprovada`, `recusada`. Motivos só na recusa, copiados de `ResultadoFicha.motivos`.
 
@@ -462,7 +472,7 @@ Confirmar no início da onda citada, antes de criar o arquivo. Nenhuma está res
 | Pendência | Bloqueia | O que falta |
 |-----------|----------|-------------|
 | Nome, conceito e atributos da segunda ficha de seed. A primeira pode usar os números do spec (Poder 2, Habilidade 2, Resistência 2, Luta, Manha, Forte, Ataque Especial Preciso), que não têm nome | Onda 1 | Dois nomes e dois conceitos originais, sem texto do livreto |
-| Nome do header de correlation id | Onda 4 | Um único nome usado no POST, no worker e na página |
-| Método e path da leitura autenticada da inscrição | Onda 4 | Os docs pedem a tela e o filtro por `sub`, e não nomeiam a rota. Registrar o path aqui antes de criar controller e página |
+| Nome do header de correlation id | Onda 4 | Fechado: `x-correlation-id` no POST, no `GET /inscricoes/:id`, no log da API, no log do worker e na página |
+| Método e path da leitura autenticada da inscrição | Onda 4 | Fechado: `GET /inscricoes/:id`, Bearer, filtro por `sub`. Ausente ou de outro dono: 404. Página `/fichas/:id` |
 | Cliente SQL | Onda 1 | O repo não tem ORM nem `pg`. Escolher um cliente e ficar nele |
 | Ajuste de ESLint para TSX | Onda 2 | Só se `npm run lint` falhar. Não antecipar a mudança |
