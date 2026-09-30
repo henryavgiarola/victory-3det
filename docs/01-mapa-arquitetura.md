@@ -67,6 +67,8 @@ A arquitetura adotada é:
 
 O frontend e o backend são aplicações independentes.
 
+O monorepo deste repositório está na seção **No repositório**. O desenho abaixo é o modelo de aplicações separadas, não um path pendente.
+
 A estrutura esperada do repositório é:
 
 ```text
@@ -94,80 +96,45 @@ Caso frontend e backend estejam em repositórios independentes, a mesma arquitet
 
 # No repositório
 
-Esta seção deve ser atualizada conforme novas funcionalidades, módulos ou componentes arquiteturais forem implementados.
-
-## Frontend
+O tree da demo. A matemática da ficha fica em `packages/rules` e não importa Next, Nest, banco nem fila. Não há diretório `frontend/` nem `backend/`.
 
 ```text
-frontend/
-└── src/
-    ├── app/
-    │   ├── (public)/
-    │   ├── (authenticated)/
-    │   ├── layout.tsx
-    │   └── page.tsx
-    │
-    ├── features/
-    │   ├── auth/
-    │   ├── users/
-    │   └── <feature>/
-    │
-    ├── components/
-    │   ├── ui/
-    │   ├── layout/
-    │   └── shared/
-    │
-    ├── lib/
-    │   ├── api/
-    │   ├── auth/
-    │   └── utils/
-    │
-    ├── hooks/
-    ├── types/
-    └── styles/
+packages/rules/src/
+├── ficha.ts
+├── index.ts
+├── validar-ficha.ts
+└── validar-ficha.spec.ts
+
+apps/web/src/
+├── auth.ts
+├── listar-fichas-publicas.ts
+└── app/
+    ├── page.tsx
+    ├── api/sessao/login/route.ts
+    ├── api/sessao/callback/route.ts
+    ├── api/inscricoes/route.ts
+    ├── api/inscricoes/[id]/route.ts
+    ├── fichas/nova/page.tsx
+    └── fichas/[id]/page.tsx
+
+apps/api/src/
+├── main.ts
+├── app.module.ts
+├── fichas-publicas.controller.ts
+├── inscricoes.controller.ts
+├── inscricoes.repository.ts
+├── jwt.guard.ts
+├── fila-validacao.ts
+├── worker-validacao.ts
+└── processar-validacao.spec.ts
+
+apps/keycloak/victory-realm.json
+docker-compose.yml
 ```
 
-## Backend
+O cookie `sessao` fica no Next. O Nest confere o JWT na JWKS. O worker chama `validarFicha`.
 
-```text
-backend/
-└── src/
-    ├── main.ts
-    ├── app.module.ts
-    │
-    ├── auth/
-    │   ├── auth.module.ts
-    │   ├── auth.controller.ts
-    │   ├── auth.service.ts
-    │   ├── dto/
-    │   └── guards/
-    │
-    ├── users/
-    │   ├── users.module.ts
-    │   ├── users.controller.ts
-    │   ├── users.service.ts
-    │   ├── users.repository.ts
-    │   ├── dto/
-    │   └── entities/
-    │
-    ├── <feature>/
-    │   ├── <feature>.module.ts
-    │   ├── <feature>.controller.ts
-    │   ├── <feature>.service.ts
-    │   ├── dto/
-    │   └── ...
-    │
-    ├── common/
-    │   ├── decorators/
-    │   ├── filters/
-    │   ├── guards/
-    │   ├── interceptors/
-    │   └── pipes/
-    │
-    └── config/
-```
-
-A estrutura acima representa o modelo arquitetural. Ela deve ser adaptada ao código efetivamente existente.
+As árvores de `frontend/` e `backend/` nas seções anteriores são o modelo de organização. Não são diretórios a criar ao lado de `apps/`.
 
 Não criar diretórios vazios apenas para seguir o modelo.
 

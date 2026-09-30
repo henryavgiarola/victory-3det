@@ -9,7 +9,7 @@ Todo push e todo pull request dispara três checks no GitHub Actions. Os três p
 | --- | --- | --- |
 | Lint | `npm run lint` | ESLint no TypeScript |
 | Typecheck | `npm run typecheck` | `tsc --noEmit` sem emitir arquivo |
-| Test | `npm test` | Regra de criação da ficha, sem banco e sem fila |
+| Test | `npm test` | Regra da ficha e o caso de uso da inscrição, sem banco, fila nem Keycloak |
 
 ```bash
 npm ci
@@ -25,6 +25,36 @@ O workflow está em `.github/workflows/ci.yml`. Não há job de build nem de dep
 Lint, Typecheck e Test são obrigatórios no pull request para `development`, `release/*` e `main`. O detalhe da migração está em `docs/plano-acao-ci-cd.md`.
 
 O corte da demo e as fronteiras entre a regra, o Next e o Nest estão em `docs/`. Papéis de sessão ficam em `.agents/` e os procedimentos em `.skills/`. O índice para o Cursor é `AGENTS.md`.
+
+## Demo
+
+`docker compose up --build` sobe o browser em `http://localhost:3001`, a API em `http://localhost:3000` e o Keycloak em `http://localhost:8080`. Postgres e Redis não publicam porta no host. Os três checks acima não sobem esse Compose.
+
+```text
+browser
+  │
+  ▼
+Next (sessão httpOnly, PKCE)
+  │  Authorization: Bearer
+  ▼
+Nest (JWT via JWKS)
+  ├── Postgres   linha da inscrição
+  └── Redis      job validar-ficha
+        │
+        ▼
+      worker     validarFicha → aprovada | recusada
+```
+
+A matemática fica só em `packages/rules`. O Next e o Nest chamam `validarFicha`; não recalculam o pool.
+
+| Passo | Onde | O que mostrar |
+| --- | --- | --- |
+| Lista pública | `/` | Só fichas `aprovada`, com nome, conceito, P/H/R e PA/PM/PV. Sem login |
+| Login | `/fichas/nova` | Sem o cookie `sessao`, o Next redireciona ao Keycloak. Usuário `jogador`, senha `jogador` |
+| Inscrição | `POST /inscricoes` | 201 `submetida`. O Nest grava o `sub` do token, publica `validar-ficha` e devolve `x-correlation-id` |
+| Status | `/fichas/:id` | `em_processamento`, depois `aprovada` ou `recusada` com os motivos. Outro `sub` recebe 404 |
+
+O worker, no mesmo processo da API, é quem grava `aprovada` ou `recusada`. Rolagem, combate, PDF e mobile ficam de fora.
 
 # Processo de criação do projeto
 
@@ -750,4 +780,11 @@ Referência para a utilização dos status checks como requisito para integraç�
 * consolidação do modelo arquitetural;
 * definição de **Feature-Oriented Modular Architecture + Modular Monolith**.
 
-**Próxima etapa:** continuar a implementação funcional seguindo o mapa arquitetural e as regras de CI/CD estabelecidas.
+**Demo — no ar em `development`**
+
+* home pública, login PKCE e inscrição;
+* worker `validar-ficha` com correlation id;
+* caso de uso no Jest, sem Docker;
+* Compose com Next, Nest, Postgres, Redis e Keycloak.
+
+**Próxima etapa:** release quando houver uma versão para publicar. `main` ainda não inclui o app Next.
