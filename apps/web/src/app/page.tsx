@@ -8,6 +8,9 @@ export default async function Home() {
   return (
     <main>
       <h1>Fichas públicas</h1>
+      <p>
+        <a href="/fichas/nova">Nova ficha</a>
+      </p>
       {fichas.length === 0 ? <p>Nenhuma ficha aprovada.</p> : null}
       <ul>
         {fichas.map((ficha) => (

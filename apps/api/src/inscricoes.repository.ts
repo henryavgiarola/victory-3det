@@ -110,6 +110,20 @@ export class InscricoesRepository implements OnModuleInit, OnModuleDestroy {
     return publicas;
   }
 
+  async inserir(entrada: { nome: string; conceito: string; ficha: Ficha; sub: string }): Promise<string> {
+    const id = crypto.randomUUID();
+    await this.conexao().query(
+      `INSERT INTO inscricoes (id, nome, conceito, ficha, status, sub, correlation_id, motivos)
+       VALUES ($1, $2, $3, $4::jsonb, 'submetida', $5, NULL, '[]'::jsonb)`,
+      [id, entrada.nome, entrada.conceito, JSON.stringify(entrada.ficha), entrada.sub],
+    );
+    return id;
+  }
+
+  async remover(id: string): Promise<void> {
+    await this.conexao().query("DELETE FROM inscricoes WHERE id = $1 AND status = 'submetida'", [id]);
+  }
+
   private conexao(): Pool {
     if (!this.pool) {
       throw new Error("Postgres ainda não conectou.");
