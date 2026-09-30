@@ -20,6 +20,30 @@ services:
       PORT: "3000"
     ports:
       - "3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/fichas-publicas').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 20
     depends_on:
       postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      API_URL: http://api:3000
+      PORT: "3001"
+    ports:
+      - "3001:3001"
+    depends_on:
+      api:
         condition: service_healthy
