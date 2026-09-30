@@ -6,7 +6,7 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "typecheck": "tsc -p ../../packages/rules/tsconfig.build.json && tsc -p tsconfig.json --noEmit",
-    "test": "jest --config jest.config.mjs"
+    "test": "tsc -p ../../packages/rules/tsconfig.build.json && jest --config jest.config.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",
