@@ -876,3 +876,46 @@ Nesta mesma noite, `apps/web/tsconfig.json` perdeu a opção `baseUrl`. Ela vali
 # 7. Próximo passo
 
 Não há onda de produto pendente no plano. O que falta para a demo estar em `main` é uma release a partir de `development`, no fluxo já usado: `release/x.y.z`, merge commit em `main`, tag anotada e a volta para `development`.
+
+
+# Dia 5 — Sexta, 02/10/2026
+
+## Interface da demo
+
+O quinto dia não abriu onda nova do plano. A demo já estava em `development` (`bd50910`) e em `main` na tag `v0.3.0` (merge `58093af`): home, login, inscrição e worker. O trabalho foi visual. `packages/rules`, a API, o worker e `.github/workflows/ci.yml` não mudaram. A matemática continua em `validarFicha`.
+
+A branch `feat/evolving-ui-ux` leva o commit `e3ea527`. O pull request https://github.com/henryavgiarola/victory-3det/pull/20 tinha sido aberto contra `main`. A base passou a ser `development`, no fluxo já usado: squash na integração e release só depois.
+
+---
+
+# 1. Tema
+
+`@victory/web` não tinha Material UI. Entraram `@mui/material`, `@mui/icons-material` e `@mui/material-nextjs` na 9.4.0, com Emotion. O tema fica em `apps/web/src/tema/tema.ts` e o provedor em `provedor-tema.tsx`.
+
+O roxo `#5B21B6` é a cor de identidade. O verde `#047857` marca o que está positivo. O amarelo `#EAB308` fica na atenção e na ação secundária, com texto `#1C1028`. O ciano `#0E7490` é a informação. O fundo é `#F4F0FA` e o texto `#1A1226`. O modo claro fica fixo, com `cssVariables: false`, para a leitura não seguir o tema do sistema. Os títulos usam Outfit e o corpo Source Sans 3.
+
+O primeiro `next build` falhou: o `Link` do Next saía de um Server Component e entrava no botão do Material UI. O cabeçalho, em `cabecalho.tsx`, passou a ser Client Component. A barra mostra a marca Victory e o botão "Nova ficha".
+
+---
+
+# 2. Telas
+
+A `/` continua Server Component e ainda lê `GET /fichas-publicas` no servidor. Cada ficha aprovada virou card, com chips de Poder, Habilidade, Resistência, PA, PM e PV. Lista vazia e falha de carga viram alerta. `globals.css` deixou de fixar fundo `#fff` e texto `#111`. O tema cobre os dois.
+
+`/fichas/nova` ganhou campos com rótulo e seções. Os nomes visíveis estão em `apps/web/src/tema/rotulos.ts`. Os valores enviados continuam os códigos da regra. O formulário segue chamando `validarFicha`. Uma ficha ilegal ainda pode ser enviada. Ágil com Atrapalhado mostra o motivo `Ágil e Atrapalhado não podem estar na mesma ficha.`
+
+`/fichas/:id` mostra uma barra enquanto o status é `submetida` ou `em_processamento`, o status cru ao lado do nome legível, os motivos quando a ficha é recusada e o correlation id.
+
+---
+
+# 3. Prova
+
+`npm run lint`, `npm run typecheck` e `npm test` passaram. São os sete testes da regra e os cinco do caso de uso. `npm run build -w @victory/web` passou depois do ajuste do cabeçalho.
+
+No browser, com a API desligada, a home mostrou o alerta de falha de carga. O formulário respondeu ao clique em Ágil e em Atrapalhado e exibiu o motivo da regra. Uma inscrição sem a API mostrou `Erro 500`. Os cards das sementes não apareceram nessa prova, porque a lista depende da API.
+
+---
+
+# 4. Próximo passo
+
+Este registro entra no mesmo incremento da interface. O pull request 20 segue para `development` por squash. `main` recebe o conjunto só na release seguinte, com merge commit, tag anotada e a volta para `development`.
