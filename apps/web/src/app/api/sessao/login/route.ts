@@ -10,7 +10,7 @@ export async function GET() {
   const destino = new URL(`/realms/${realm}/protocol/openid-connect/auth`, publico);
   destino.searchParams.set("client_id", clientId);
   destino.searchParams.set("response_type", "code");
-  destino.searchParams.set("scope", "openid");
+  destino.searchParams.set("scope", "openid profile");
   destino.searchParams.set("redirect_uri", redirectUri(appUrl));
   destino.searchParams.set("state", state);
   destino.searchParams.set("code_challenge", challenge);

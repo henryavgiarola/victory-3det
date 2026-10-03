@@ -49,8 +49,11 @@ A matemática fica só em `packages/rules`. O Next e o Nest chamam `validarFicha
 
 | Passo | Onde | O que mostrar |
 | --- | --- | --- |
-| Lista pública | `/` | Só fichas `aprovada`, com nome, conceito, P/H/R e PA/PM/PV. Sem login |
-| Login | `/fichas/nova` | Sem o cookie `sessao`, o Next redireciona ao Keycloak. Usuário `jogador`, senha `jogador` |
+| Painel | `/` | Sem o cookie `sessao`, o Next redireciona ao Keycloak. Com sessão, três cards e sem sidebar |
+| Login | Keycloak | Usuário `jogador`, senha `jogador`. Sair apaga os cookies `sessao` e `pkce` |
+| Nova ficha | `/fichas/nova` | O formulário chama `validarFicha`. O envio cria `submetida` |
+| Personagens | `/fichas` | As fichas deste `sub`, em qualquer status, e as `aprovada` |
+| Conta | `/conta` | Nome, sobrenome e senha ficam no Keycloak. O círculo mostra as iniciais |
 | Inscrição | `POST /inscricoes` | 201 `submetida`. O Nest grava o `sub` do token, publica `validar-ficha` e devolve `x-correlation-id` |
 | Status | `/fichas/:id` | `em_processamento`, depois `aprovada` ou `recusada` com os motivos. Outro `sub` recebe 404 |
 
@@ -919,3 +922,57 @@ No browser, com a API desligada, a home mostrou o alerta de falha de carga. O fo
 # 4. Próximo passo
 
 Este registro entra no mesmo incremento da interface. O pull request 20 segue para `development` por squash. `main` recebe o conjunto só na release seguinte, com merge commit, tag anotada e a volta para `development`.
+
+# Dia 6 — Sábado, 03/10/2026
+
+## Sessão, painel e conta
+
+O sexto dia partiu de `development` em `1b04b3f`, a volta da release `v0.4.0`. A branch é `feature/sessao-na-entrada`. A matemática continua em `validarFicha`. O Nest não ganhou tabela de usuário. `.github/workflows/ci.yml` não mudou.
+
+A `/` deixou de ser anônima. `GET /fichas-publicas` continua público na API. A página que lista as aprovadas passou a exigir sessão.
+
+---
+
+# 1. Entrada
+
+`exigirSessao`, em `apps/web/src/auth.ts`, lê o cookie `sessao`. Cookie ausente, malformado ou com `exp` vencido manda para `/api/sessao/login`. A assinatura do JWT continua só no `JwtGuard`. Um token com `exp` futuro e assinatura ruim ainda abre a página até uma chamada autenticada responder 401.
+
+O callback, depois do Keycloak, abre `/`. `GET /api/sessao/logout` apaga `sessao` e `pkce` e volta ao login. Se o Nest responde 401, o BFF apaga esses cookies e o formulário ou o painel de status navegam ao login.
+
+---
+
+# 2. Minha conta
+
+A rota é `/conta`. O BFF lê e grava nome e sobrenome em `GET`/`POST` da Account API do Keycloak, no host interno. A senha vai em `POST .../account/credentials/password`, com a senha atual obrigatória. O app confirma que a senha nova e a confirmação são iguais antes de chamar o Keycloak. Não há hash de senha no Nest e não há recuperação de senha.
+
+O login passou a pedir o escopo `openid profile`. O realm dá a `jogador` e a `visitante` os papéis `manage-account` e `view-profile` do client `account`. O container do Keycloak precisa ser recriado para reler esse JSON: não há volume nomeado. O círculo usa as iniciais. Não há upload.
+
+---
+
+# 3. Cabeçalho, sidebar e painel
+
+O layout raiz ficou só com o tema. O grupo `(area)` não muda a URL. `/fichas/nova`, `/fichas`, `/fichas/:id` e `/conta` têm cabeçalho e sidebar. O cabeçalho mostra a marca à esquerda e, à direita, o círculo, o nome, o sobrenome e Sair. Em largura estreita a sidebar é um drawer, para não cobrir o formulário.
+
+O painel é `/`. Três cards apontam para `/fichas/nova`, `/fichas` e `/conta`. Essa rota não tem sidebar.
+
+---
+
+# 4. Personagens
+
+`GET /inscricoes` lista as linhas em que `sub` é o do token, em qualquer status, com `WHERE sub = $1`. A página `/fichas` mostra essa lista, com link para `/fichas/:id`, e as aprovadas de `GET /fichas-publicas`, sem link. `FichaPublica` continua sem `id`. As sementes Lívia e Nuno têm `sub` nulo, então aparecem só entre as aprovadas. Não há editar nem excluir.
+
+O formulário de nova ficha não foi reescrito. Enviar ainda cria `submetida` e abre `/fichas/:id`. Uma ficha ilegal ainda pode ser enviada. Ágil com Atrapalhado continua com o motivo já coberto pelo spec.
+
+---
+
+# 5. Prova
+
+`npm run lint`, `npm run typecheck` e `npm test` passaram. São os sete testes da regra e os cinco do caso de uso. O ESLint passou a ignorar `.next`, que o `next dev` gera e o Git já deixa de fora. Sem isso, um servidor local fazia o lint falhar em arquivo que não entra no repositório.
+
+A prova no browser do login, da conta e das duas listas ficou para depois de recriar o Keycloak. A entrada sem cookie foi conferida por HTTP na onda da sessão: `/`, `/fichas/nova` e `/fichas/:id` respondem 307 para o login; o logout limpa os dois cookies; o POST sem cookie responde 401.
+
+---
+
+# 6. Próximo passo
+
+Este registro entra no mesmo incremento. O pull request https://github.com/henryavgiarola/victory-3det/pull/23 leva `feature/sessao-na-entrada` para `development` por squash. `main` recebe o conjunto na release `0.5.0`, com merge commit, tag anotada `v0.5.0` e a volta para `development`.

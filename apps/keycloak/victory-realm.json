@@ -85,6 +85,9 @@
       "lastName": "Demo",
       "email": "jogador@example.com",
       "requiredActions": [],
+      "clientRoles": {
+        "account": ["manage-account", "view-profile"]
+      },
       "credentials": [
         {
           "type": "password",
@@ -101,6 +104,9 @@
       "lastName": "Demo",
       "email": "visitante@example.com",
       "requiredActions": [],
+      "clientRoles": {
+        "account": ["manage-account", "view-profile"]
+      },
       "credentials": [
         {
           "type": "password",

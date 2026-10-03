@@ -163,6 +163,17 @@ export class InscricoesRepository implements OnModuleInit, OnModuleDestroy {
     return linha;
   }
 
+  async listarDoDono(sub: string): Promise<Pick<Inscricao, "id" | "nome" | "conceito" | "status" | "motivos">[]> {
+    const resultado = await this.conexao().query<Pick<Inscricao, "id" | "nome" | "conceito" | "status" | "motivos">>(
+      `SELECT id, nome, conceito, status, motivos
+       FROM inscricoes
+       WHERE sub = $1
+       ORDER BY nome`,
+      [sub],
+    );
+    return resultado.rows;
+  }
+
   async marcarProcessamento(id: string): Promise<void> {
     await this.conexao().query(
       "UPDATE inscricoes SET status = 'em_processamento' WHERE id = $1 AND status = 'submetida'",

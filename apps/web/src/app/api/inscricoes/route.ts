@@ -1,11 +1,15 @@
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { limparSessao } from "../../../auth";
 
 export async function POST(requisicao: Request) {
   const jar = await cookies();
   const token = jar.get("sessao")?.value;
   const api = process.env.API_URL;
   if (!token || !api) {
-    return new Response(null, { status: 401 });
+    const negado = new NextResponse(null, { status: 401 });
+    limparSessao(negado);
+    return negado;
   }
 
   const resposta = await fetch(new URL("/inscricoes", api), {
@@ -22,5 +26,11 @@ export async function POST(requisicao: Request) {
   if (correlationId) {
     headers.set("x-correlation-id", correlationId);
   }
-  return new Response(await resposta.text(), { status: resposta.status, headers });
+  const corpo = await resposta.text();
+  if (resposta.status === 401) {
+    const negado = new NextResponse(corpo, { status: 401, headers });
+    limparSessao(negado);
+    return negado;
+  }
+  return new Response(corpo, { status: resposta.status, headers });
 }

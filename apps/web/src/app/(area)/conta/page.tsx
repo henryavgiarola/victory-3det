@@ -1,28 +1,24 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { FormularioFicha } from "./formulario-ficha";
+import { exigirSessao } from "../../../auth";
+import { FormularioConta } from "./formulario-conta";
 
 export const dynamic = "force-dynamic";
 
-export default async function NovaFicha() {
-  const jar = await cookies();
-  if (!jar.get("sessao")?.value) {
-    redirect("/api/sessao/login");
-  }
+export default async function Conta() {
+  await exigirSessao();
 
   return (
     <Stack spacing={3}>
       <header>
         <Typography variant="h1" sx={{ fontSize: { xs: "1.75rem", sm: "2.25rem" } }}>
-          Nova ficha
+          Minha conta
         </Typography>
         <Typography color="text.secondary" sx={{ mt: 1 }}>
-          Monte o personagem e envie. A regra continua valendo no envio.
+          Nome e senha ficam no Keycloak. A imagem circular usa as iniciais enquanto não há arquivo.
         </Typography>
       </header>
-      <FormularioFicha />
+      <FormularioConta />
     </Stack>
   );
 }
