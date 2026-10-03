@@ -744,6 +744,8 @@ Testes: os sete de `packages/rules` e os cinco de `processar-validacao.spec.ts` 
 
 Risco: baixo, se a onda não reescrever o formulário.
 
+Decisão aplicada: o formulário em `/fichas/nova` não foi reescrito. O card do painel e o item da sidebar já apontam para essa rota. O envio continua criando `submetida` e abrindo `/fichas/[id]`.
+
 ### Onda 7 — Prova integrada
 
 Não há E2E no repositório. Esta onda não cria framework novo. Ela junta a prova manual e os comandos já existentes.
@@ -764,7 +766,7 @@ Risco: médio se a prova manual pular o caso de outro `sub`.
 | 3 | Layout | Frontend | `Cabecalho` global sem usuário; sem sidebar | Nome e avatar à direita; sidebar fora do painel | `apps/web/src/app/layout.tsx`, `apps/web/src/app/cabecalho.tsx`, `apps/web/src/tema/tema.ts` | Onda 2 para o nome real | Prova visual | Médio | Concluído |
 | 4 | Painel | Frontend | Não existe; login abre `/fichas/nova` | Três cards, sem sidebar | `apps/web/src/app/api/sessao/callback/route.ts` e rota nova ainda sem path | Ondas 1 e 3 | Prova manual | Baixo | Concluído |
 | 5 | Personagens | Full stack | Pública = `aprovada`, sem id no JSON; dono só em `GET /inscricoes/:id` | Lista do `sub` e lista aprovada já definida | `apps/api/src/inscricoes.repository.ts`, `apps/api/src/fichas-publicas.controller.ts` | Onda 1; pendência do `id` público | Caso de uso sem Docker, se a lista for função testável | Alto | Concluído |
-| 6 | Nova ficha | Full stack | Fluxo completo até `submetida` | O mesmo fluxo, aberto pelo card e pela sidebar | `apps/web/src/app/fichas/nova/formulario-ficha.tsx`, `apps/api/src/inscricoes.controller.ts` | Ondas 3 e 4 | Specs atuais de regra e caso de uso | Baixo | Não iniciado |
+| 6 | Nova ficha | Full stack | Fluxo completo até `submetida` | O mesmo fluxo, aberto pelo card e pela sidebar | `apps/web/src/app/fichas/nova/formulario-ficha.tsx`, `apps/api/src/inscricoes.controller.ts` | Ondas 3 e 4 | Specs atuais de regra e caso de uso | Baixo | Concluído |
 | 7 | Prova integrada | Full stack | Jest da regra e do caso de uso; sem E2E | Lint, typecheck, test e prova manual do fluxo novo | `.github/workflows/ci.yml` sem edição | Ondas 1 a 6 | Os comandos da raiz | Médio | Não iniciado |
 
 ## 12. Estratégia de testes
