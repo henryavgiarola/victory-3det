@@ -6,6 +6,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { exigirSessao } from "../auth";
 import { listarFichasPublicas, type FichaPublica } from "../listar-fichas-publicas";
+import { MolduraPainel } from "./moldura-painel";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function Home() {
   }
 
   return (
+    <MolduraPainel>
     <Stack spacing={3}>
       <header>
         <Typography variant="h1" sx={{ fontSize: { xs: "1.75rem", sm: "2.25rem" } }}>
@@ -54,5 +56,6 @@ export default async function Home() {
         ))}
       </Stack>
     </Stack>
+    </MolduraPainel>
   );
 }

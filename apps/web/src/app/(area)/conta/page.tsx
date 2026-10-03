@@ -1,6 +1,6 @@
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { exigirSessao } from "../../auth";
+import { exigirSessao } from "../../../auth";
 import { FormularioConta } from "./formulario-conta";
 
 export const dynamic = "force-dynamic";

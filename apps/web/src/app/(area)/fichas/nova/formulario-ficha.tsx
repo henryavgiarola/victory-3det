@@ -29,7 +29,7 @@ import {
   ROTULO_DESVANTAGEM,
   ROTULO_PERICIA,
   ROTULO_VANTAGEM,
-} from "../../../tema/rotulos";
+} from "../../../../tema/rotulos";
 
 const VANTAGENS_SIMPLES = [
   "agil",

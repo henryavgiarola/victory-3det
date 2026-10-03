@@ -706,6 +706,8 @@ Testes: prova visual desktop e largura estreita. Não há teste de componente.
 
 Risco: médio de regressão no formulário, que hoje cabe em 880px.
 
+Decisão aplicada: o grupo `(area)` não muda a URL. O painel fica em `/` com cabeçalho e sem sidebar. `/fichas/nova`, `/fichas/[id]` e `/conta` usam cabeçalho, avatar com iniciais e sidebar. Em largura estreita a sidebar é um drawer.
+
 ### Onda 4 — Painel
 
 Escopo: rota inicial pós-login com três cards. Nova ficha aponta para `/fichas/nova`. Meus personagens e Minha conta apontam para as rotas das ondas 5 e 2. Sem sidebar nesta rota. Reutilizar `Card` do Material UI. Não duplicar a regra da ficha no card.
@@ -755,7 +757,7 @@ Risco: médio se a prova manual pular o caso de outro `sub`.
 | 0 | Baseline | Geral | Home pública, login só em `/fichas/nova` e `/fichas/[id]`, sem conta nem sidebar | Diagnóstico citado em path real | `docs/plano-acao-implementacao.md` | Código em `apps/web` e `apps/api` | Nenhum nesta execução | Baixo | Concluído |
 | 1 | Autenticação | Full stack | Cookie presente libera a página; callback vai a `/fichas/nova`; sem logout | Entrada exige sessão; logout apaga `sessao`; 401 volta ao login | `apps/web/src/app/page.tsx`, `apps/web/src/app/api/sessao/callback/route.ts`, `apps/web/src/app/fichas/nova/page.tsx` | Fluxo PKCE já existente | Prova manual | Alto | Concluído |
 | 2 | Minha conta | Full stack | Nome e senha só no Keycloak; sem avatar e sem endpoint | Editar nome, sobrenome e senha na fonte já existente; avatar bloqueado até a pendência | `apps/keycloak/victory-realm.json`, `apps/web/src/app/api/sessao/login/route.ts` | Onda 1; pendência do arquivo de imagem | Prova manual com `jogador` | Alto | Concluído |
-| 3 | Layout | Frontend | `Cabecalho` global sem usuário; sem sidebar | Nome e avatar à direita; sidebar fora do painel | `apps/web/src/app/layout.tsx`, `apps/web/src/app/cabecalho.tsx`, `apps/web/src/tema/tema.ts` | Onda 2 para o nome real | Prova visual | Médio | Não iniciado |
+| 3 | Layout | Frontend | `Cabecalho` global sem usuário; sem sidebar | Nome e avatar à direita; sidebar fora do painel | `apps/web/src/app/layout.tsx`, `apps/web/src/app/cabecalho.tsx`, `apps/web/src/tema/tema.ts` | Onda 2 para o nome real | Prova visual | Médio | Concluído |
 | 4 | Painel | Frontend | Não existe; login abre `/fichas/nova` | Três cards, sem sidebar | `apps/web/src/app/api/sessao/callback/route.ts` e rota nova ainda sem path | Ondas 1 e 3 | Prova manual | Baixo | Não iniciado |
 | 5 | Personagens | Full stack | Pública = `aprovada`, sem id no JSON; dono só em `GET /inscricoes/:id` | Lista do `sub` e lista aprovada já definida | `apps/api/src/inscricoes.repository.ts`, `apps/api/src/fichas-publicas.controller.ts` | Onda 1; pendência do `id` público | Caso de uso sem Docker, se a lista for função testável | Alto | Não iniciado |
 | 6 | Nova ficha | Full stack | Fluxo completo até `submetida` | O mesmo fluxo, aberto pelo card e pela sidebar | `apps/web/src/app/fichas/nova/formulario-ficha.tsx`, `apps/api/src/inscricoes.controller.ts` | Ondas 3 e 4 | Specs atuais de regra e caso de uso | Baixo | Não iniciado |

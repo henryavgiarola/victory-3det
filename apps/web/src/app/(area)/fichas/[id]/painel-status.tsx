@@ -8,7 +8,7 @@ import Chip from "@mui/material/Chip";
 import LinearProgress from "@mui/material/LinearProgress";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { ROTULO_STATUS } from "../../../tema/rotulos";
+import { ROTULO_STATUS } from "../../../../tema/rotulos";
 
 interface Estado {
   status: string;
