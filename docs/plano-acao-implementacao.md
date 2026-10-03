@@ -476,3 +476,392 @@ Confirmar no início da onda citada, antes de criar o arquivo. Nenhuma está res
 | Método e path da leitura autenticada da inscrição | Onda 4 | Fechado: `GET /inscricoes/:id`, Bearer, filtro por `sub`. Ausente ou de outro dono: 404. Página `/fichas/:id` |
 | Cliente SQL | Onda 1 | O repo não tem ORM nem `pg`. Escolher um cliente e ficar nele |
 | Ajuste de ESLint para TSX | Onda 2 | Só se `npm run lint` falhar. Não antecipar a mudança |
+
+---
+
+# Plano de Ação — Autenticação, Dashboard e Gestão do Usuário
+
+Diagnóstico em 2026-10-03. Esta parte não substitui o plano da demo acima e não renumera as seções 1 a 12. Nenhuma onda abaixo foi implementada. Nenhum código, teste ou configuração foi alterado nesta execução.
+
+## 1. Objetivo
+
+A entrada da aplicação passa a exigir sessão. Depois do login, a pessoa vê um painel com três entradas: Nova ficha, Meus personagens e Minha conta. Nome e sobrenome aparecem no cabeçalho, com a imagem em círculo. A sidebar existe em todas as telas autenticadas, exceto nesse painel. O fluxo atual de Keycloak, cookie `sessao` e `JwtGuard` é estendido. Não se cria um segundo login.
+
+## 2. Requisitos funcionais
+
+1. A primeira tela exige autenticação.
+2. Depois do login, abre um painel inicial.
+3. O painel tem cards para Nova ficha, Meus personagens e Minha conta.
+4. Meus personagens lista o que a pessoa criou e o que já é público pelas regras que o código já tem, ou por regra ainda não escrita.
+5. Minha conta edita nome, sobrenome, imagem e senha.
+6. Nome e sobrenome ficam no canto superior direito depois do login.
+7. A imagem fica ao lado do nome, em círculo.
+8. Toda tela autenticada, menos o painel, tem sidebar.
+9. A sidebar repete Nova ficha, Meus personagens e Minha conta.
+10. A navegação respeita autenticação e autorização.
+11. URL direta de área protegida, sem sessão, não abre a área.
+12. O login existente é estendido, não duplicado.
+
+## 3. Contexto
+
+A demo já está em `apps/web` e `apps/api`. A identidade mora no Keycloak, realm `victory`, arquivo `apps/keycloak/victory-realm.json`. O Next guarda só o access token no cookie httpOnly `sessao`. O Nest não tem tabela de usuário. A ficha é a linha `inscricoes`, dono na coluna `sub`.
+
+O plano acima, da inscrição, descreve o alvo da demo e está desatualizado no preâmbulo (ainda diz que `apps/` não existe). O código desta data é a fonte desta parte.
+
+## 4. Diagnóstico
+
+| Requisito | Estado atual | Estado esperado | Diferença | Camada | Arquivos | Dependências |
+|-----------|--------------|-----------------|-----------|--------|----------|--------------|
+| Login obrigatório na entrada | `/` em `apps/web/src/app/page.tsx` é pública e lista fichas aprovadas sem cookie | A primeira tela pede sessão | A home deixa de ser anônima | Frontend | `apps/web/src/app/page.tsx`, `apps/web/src/app/api/sessao/callback/route.ts` | Cookie `sessao` já existe |
+| Dashboard | Não há rota de painel. O callback redireciona para `/fichas/nova` | Painel com três cards depois do login | Rota e destino do callback ainda não existem | Frontend | `apps/web/src/app/api/sessao/callback/route.ts` | Onda de proteção |
+| Nova ficha | `/fichas/nova` existe, exige cookie presente, formulário em `formulario-ficha.tsx` chama `validarFicha` | Card e item de sidebar apontam para esse fluxo | Falta só a entrada no painel e na sidebar | Frontend | `apps/web/src/app/fichas/nova/page.tsx` | Nenhuma API nova |
+| Meus personagens | Não há listagem por dono. `GET /inscricoes/:id` lê uma linha se o `sub` bater | Lista das fichas daquele `sub` | Endpoint e página ausentes | Full stack | `apps/api/src/inscricoes.controller.ts`, `apps/api/src/inscricoes.repository.ts` | Coluna `sub` já existe |
+| Personagens públicos | `GET /fichas-publicas` devolve só `status = aprovada`, sem id e sem dono. Sementes nascem `aprovada` com `sub` NULL | A área Meus personagens também mostra esse conjunto, se a regra for essa | O JSON público não tem `id`. Não há página de detalhe público | Full stack | `apps/api/src/fichas-publicas.controller.ts`, `apps/api/src/inscricoes.repository.ts` | Regra de “público” ainda é só o status |
+| Minha conta | Não há página, DTO nem endpoint de perfil | Formulário de nome, sobrenome, imagem e senha | Tudo a criar. Nome e senha estão no Keycloak, não no Postgres | Full stack | `apps/keycloak/victory-realm.json` | Onda de identidade |
+| Avatar | Não há coluna, atributo, upload nem componente | Círculo no cabeçalho, com fallback se não houver imagem | Não há onde gravar o arquivo | Full stack | Nenhum path de avatar | Pendência de armazenamento |
+| Alteração de senha | Senha é credencial do Keycloak (`type: password` no realm). O Nest não hasheia senha | A pessoa troca a própria senha | Não há endpoint na API nem política no app | Keycloak + BFF | `apps/keycloak/victory-realm.json` | Sessão atual é só access token |
+| Header com usuário | `cabecalho.tsx` mostra “Victory” e “Nova ficha” em todas as rotas, inclusive na home | Nome, sobrenome e avatar à direita, só com sessão | O cabeçalho não lê o token nem o perfil | Frontend | `apps/web/src/app/cabecalho.tsx`, `apps/web/src/app/layout.tsx` | Escopo do token hoje é só `openid` |
+| Sidebar | Não existe | Nova ficha, Meus personagens e Minha conta, fora do painel e do login | Layout único hoje embrulha todas as páginas | Frontend | `apps/web/src/app/layout.tsx` | Rotas do painel e da conta |
+| Proteção de rotas | `/fichas/nova` e `/fichas/[id]` redirecionam se o cookie `sessao` não tem valor. Não há `middleware.ts`. O valor não é validado no Next | URL protegida sem sessão vai ao login. Sessão expirada também | Cookie presente e token vencido ainda abre a página | Frontend + API | `apps/web/src/app/fichas/nova/page.tsx`, `apps/web/src/app/fichas/[id]/page.tsx`, `apps/api/src/jwt.guard.ts` | `JwtGuard` já recusa Bearer inválido na API |
+
+## 5. Arquitetura atual
+
+### Frontend
+
+App Router em `apps/web/src/app`. Não há `pages/`, `middleware.ts`, hook de sessão, context, store, sidebar nem teste de componente.
+
+Rotas encontradas:
+
+| Rota | Sessão | O que faz |
+|------|--------|-----------|
+| `/` | Não exige | Server Component. Lê `GET /fichas-publicas` |
+| `/fichas/nova` | Cookie `sessao` com algum valor | Formulário. Sem cookie, `redirect("/api/sessao/login")` |
+| `/fichas/[id]` | Igual | Painel de status. Sem cookie, o mesmo redirect |
+| `GET /api/sessao/login` | Pública | Inicia Authorization Code + PKCE |
+| `GET /api/sessao/callback` | Pública | Troca o code e grava `sessao` |
+| `POST /api/inscricoes` | Cookie | BFF com Bearer |
+| `GET /api/inscricoes/[id]` | Cookie | BFF com Bearer |
+
+O layout raiz (`layout.tsx`) coloca `Cabecalho` e um `main` de no máximo 880px em toda página. O tema está em `apps/web/src/tema/tema.ts`. Card de ficha é `Card` do Material UI usado direto na home, sem componente compartilhado de card de navegação.
+
+Não há logout. O callback, em `apps/web/src/app/api/sessao/callback/route.ts`, manda para `/fichas/nova`. O cookie `sessao` é httpOnly, `sameSite: lax`, `maxAge` igual a `expires_in` do token, senão 300 segundos. O realm define `accessTokenLifespan` 1800. Não há refresh token gravado. O scope pedido em `apps/web/src/app/api/sessao/login/route.ts` é só `openid`.
+
+A página protegida só testa `jar.get("sessao")?.value`. Não chama o Keycloak nem o `JwtGuard`. Token vencido ou lixo ainda renderiza `/fichas/nova` e `/fichas/[id]`. A API responde 401 quando o Bearer falha.
+
+### Backend
+
+Não há `src/modules/`. Há controllers soltos:
+
+- `GET /fichas-publicas` em `fichas-publicas.controller.ts`, sem guard.
+- `POST /inscricoes` e `GET /inscricoes/:id` em `inscricoes.controller.ts`, com `JwtGuard`.
+
+`JwtGuard` (`apps/api/src/jwt.guard.ts`) confere assinatura na JWKS, emissor, audiência e `sub`. O request fica com `usuario.sub`. Não lê nome, sobrenome nem imagem. Não há role.
+
+Não há endpoint de usuário atual, perfil, senha, avatar nem listagem das fichas de um `sub`. Não há migration: a tabela nasce no boot em `SCHEMA`, dentro de `inscricoes.repository.ts`. Cliente SQL é `pg`. Não há ORM.
+
+### Autenticação
+
+Keycloak no Compose. Client `victory-web`: público, fluxo padrão, PKCE S256, direct grant desligado, redirect `http://localhost:3001/api/sessao/callback`. `registrationAllowed` é `false`. Usuários importados: `jogador` e `visitante`, com `firstName`, `lastName` e senha no realm. Admin do Compose: `KC_BOOTSTRAP_ADMIN_USERNAME` e `KC_BOOTSTRAP_ADMIN_PASSWORD` em `docker-compose.yml`, valor `admin` / `admin`. Esse admin não é conta da ficha.
+
+Não há recuperação de senha no app. Não há tela de login no Next: o browser vai à página do Keycloak.
+
+Usuário sem cookie em `/fichas/nova` ou `/fichas/[id]` cai em `/api/sessao/login`. A mesma URL em `/` abre a lista. Usuário com cookie válido chega em `/fichas/nova`, não em um painel. Logout não existe. Sessão expirada não é tratada no Next; a API recusa o Bearer.
+
+### Navegação
+
+Um cabeçalho global, sem estado de rota ativa e sem menu mobile próprio. O botão “Nova ficha” aparece também para quem não logou. Não há sidebar. O link da marca aponta para `/`.
+
+### Personagens
+
+Não há entidade Character. A ficha é `inscricoes`: `id`, `nome`, `conceito`, `ficha` jsonb, `status`, `sub`, `correlation_id`, `motivos`. O `sub` identifica o dono. Sementes Lívia e Nuno entram com `sub` NULL e `status` `aprovada`.
+
+Criar: `POST /inscricoes`, dono = `sub` do token, status inicial `submetida`. Ver uma: `GET /inscricoes/:id`, só se `sub` coincidir; senão 404. Não há editar nem excluir pela HTTP. O worker muda status. Não há paginação, filtro nem ordenação na leitura do dono. A lista pública ordena por `nome`.
+
+Público, no código: `status = aprovada` em `listarAprovadas`. Não há coluna público/privado. O JSON de `FichaPublica` não inclui `id` nem `sub`. Quem pode ver a lista pública: qualquer chamada a `GET /fichas-publicas`, sem login.
+
+### Usuário/Conta
+
+Não há tabela de usuário, tela de conta, upload nem alteração de senha. Nome e sobrenome existem só no usuário do Keycloak (`firstName`, `lastName`). A imagem não existe no realm nem no banco. A senha é credencial do Keycloak. O Nest não guarda hash.
+
+## 6. Diferenças identificadas
+
+A diferença de cada requisito está na tabela da seção 4. Problemas achados, sem correção nesta execução:
+
+| Problema | Evidência | Comportamento atual | Comportamento que o requisito pede | Alteração necessária |
+|----------|-----------|---------------------|--------------------------------------|----------------------|
+| Home anônima | `apps/web/src/app/page.tsx` não lê cookie | `/` lista fichas sem login | A primeira tela exige sessão | Tratar `/` ou uma rota nova como porta autenticada e mandar quem não tem sessão ao login |
+| Destino pós-login | `callback/route.ts` redireciona para `/fichas/nova` | Login abre o formulário | Login abre o painel | Trocar o destino do callback quando o painel existir |
+| Cookie não é sessão válida | `nova/page.tsx` e `fichas/[id]/page.tsx` só checam o valor do cookie | Token vencido ainda renderiza a página | Área protegida não abre com sessão inválida | Na onda 1, definir se a página valida o JWT ou se 401 do BFF devolve ao login |
+| Sem logout | Busca em `apps/web/src` não acha rota de logout | Não há como encerrar | Logout encerra a sessão | Rota que apaga `sessao`. Falta decidir se também encerra a sessão no Keycloak |
+| Token sem nome | `login/route.ts` pede `scope=openid`. `JwtGuard` só guarda `sub` | O app não conhece nome nem sobrenome | Cabeçalho mostra os dois | Pedir o que o Keycloak já tem (`firstName`, `lastName`) sem criar usuário paralelo no Postgres, ou registrar a pendência se o scope não bastar |
+| Lista do dono inexistente | `InscricoesRepository` não tem `SELECT` por `sub` | Só existe leitura de um id | Meus personagens lista as fichas da pessoa | Novo método e endpoint, com o mesmo filtro de dono do `GET /inscricoes/:id` |
+| JSON público sem id | `FichaPublica` em `inscricoes.repository.ts` | A home não consegue abrir uma ficha pública por id | Se o card público tiver destino, o contrato precisa de id | Não inventar o campo nesta etapa. Fechar na onda de personagens |
+| Avatar sem armazenamento | Nenhum path de upload, coluna ou atributo | Não há imagem | Círculo no cabeçalho | Bloqueado até escolher onde o arquivo fica |
+| Senha fora da API | Credencial só no realm | A aplicação não troca senha | Minha conta troca senha | BFF para a conta do Keycloak, não uma tabela nova de senha no Nest |
+| Cabeçalho em toda rota | `layout.tsx` renderiza `Cabecalho` sempre | Login do Keycloak é externo; a home anônima já tem a barra com “Nova ficha” | Login sem sidebar; painel sem sidebar; demais telas com sidebar | Separar layout da área autenticada do layout da entrada |
+| Cadastro fechado | `registrationAllowed: false` | Não há auto-cadastro | Minha conta edita quem já existe | Não abrir cadastro público como parte deste plano, salvo decisão nova |
+
+## 7. Contratos Frontend ↔ Backend
+
+Contratos que existem hoje. O que não está na tabela não tem endpoint no repositório.
+
+| Fluxo | Método e path | Auth | Request | Response | Erros |
+|-------|---------------|------|---------|----------|-------|
+| Lista pública | `GET /fichas-publicas` | Nenhuma | — | Array de `nome`, `conceito`, `poder`, `habilidade`, `resistencia`, `pa`, `pm`, `pv` | Falha de fetch vira alerta na home |
+| Criar ficha | `POST /inscricoes` | Bearer, `JwtGuard` | `nome`, `conceito` e campos de `Ficha`. `sub` do corpo é ignorado; vale o do token | 201 `{ id, status: "submetida" }` e header `x-correlation-id` | 400 corpo inválido; 401 token inválido; 500 se a fila falha, e a linha `submetida` é apagada |
+| Ler a própria | `GET /inscricoes/:id` | Bearer | — | `id`, `nome`, `conceito`, `status`, `motivos`, `correlationId` e o mesmo header | 404 se o id não existe, se o `sub` não é o dono, ou se não há `correlationId` |
+| BFF criar | `POST /api/inscricoes` | Cookie `sessao` | Repassa o JSON | Repassa status e `x-correlation-id` | 401 se não há cookie ou `API_URL` |
+| BFF ler | `GET /api/inscricoes/[id]` | Cookie `sessao` | — | Repassa o JSON | 401 nas mesmas condições |
+| Login | `GET /api/sessao/login` | Nenhuma | — | Redirect ao Keycloak e cookie `pkce` | 500 se faltar variável |
+| Callback | `GET /api/sessao/callback` | Cookie `pkce` | `code`, `state` | Redirect `/fichas/nova` e cookie `sessao` | Redirect de volta ao login se code, state ou token falharem |
+
+Não há contrato para: usuário atual, atualizar nome, atualizar sobrenome, upload de avatar, trocar senha, logout, listar fichas do `sub`, refresh token.
+
+Divergência: o Next trata cookie presente como autenticado; o Nest só aceita JWT válido. As duas camadas não concordam quando o cookie existe e o token não presta.
+
+## 8. Arquitetura afetada
+
+- Next: layout, cabeçalho, rotas novas de painel, conta e lista, callback, eventual logout. Formulário de ficha permanece.
+- Nest: leitura das fichas do `sub`, se a lista não for só no BFF com queries que não existem. Não mover sessão para o Nest. Não criar usuário no Postgres enquanto o Keycloak for a fonte do nome e da senha.
+- Keycloak: scope ou userinfo para nome e sobrenome; troca de senha e, se a pendência fechar assim, atributo de imagem. `registrationAllowed` continua falso até decisão contrária.
+- Postgres: a tabela `inscricoes` já guarda o dono. Avatar e senha não têm coluna. Não adicionar coluna sem a pendência de armazenamento fechada.
+- `packages/rules`: sem mudança. `validarFicha` continua a única conta da ficha.
+- CI: `.github/workflows/ci.yml` permanece com Lint, Typecheck e Test. Prova de browser continua fora do workflow, como no restante da demo.
+
+## 9. Dependências
+
+```text
+Cookie sessao e JwtGuard (já existem)
+        │
+        ▼
+Onda 1  entrada exige sessão, destino do login, logout, sessão vencida
+        │
+        ▼
+Onda 2  nome e sobrenome vindos do Keycloak; senha; avatar só depois da pendência
+        │
+        ├── Onda 3  cabeçalho com identidade e sidebar
+        │
+        └── Onda 4  painel com os três cards
+                │
+                ├── Onda 5  Meus personagens (lista do sub + lista aprovada já existente)
+                │
+                └── Onda 6  Nova ficha só como entrada; o formulário já existe
+```
+
+A onda 3 pode começar o desenho do layout com fallback de nome, mas o cabeçalho real depende da onda 2. A onda 5 depende da decisão sobre o que é público e se o JSON público ganha `id`. A onda 6 não espera endpoint novo.
+
+## 10. Ondas de implementação
+
+Nenhuma onda abaixo está em implementação. A onda 0 é este diagnóstico.
+
+### Onda 0 — Baseline
+
+Escopo: este texto. Confirmar Keycloak + cookie + `JwtGuard`, home pública, ausência de conta, sidebar, avatar e listagem por dono.
+
+Critério de aceite: o diagnóstico cita path real. Nenhuma onda de código marcada como concluída.
+
+Testes: não rodar suíte nesta execução. Os testes já existentes continuam os de `packages/rules` e `apps/api/src/processar-validacao.spec.ts`.
+
+Risco: baixo. Só documentação.
+
+Confirmado em 2026-10-03, antes da onda 1: o código continua com Keycloak, cookie `sessao`, `JwtGuard`, home então pública, e sem conta, sidebar, avatar ou listagem por dono. Status desta onda: concluída como diagnóstico, sem código novo.
+
+### Onda 1 — Autenticação e proteção
+
+Escopo: a primeira rota do app exige sessão. Quem não tem cookie em rota protegida vai a `/api/sessao/login`. O callback passa a abrir o painel quando ele existir; até lá, o destino novo fica nomeado nesta onda e não pode continuar só `/fichas/nova` no fim dela. Logout apaga `sessao`. Tratar cookie presente com token recusado pela API (401 leva de volta ao login). Não criar outro client nem outro cookie de access token.
+
+Fora: nome, avatar, sidebar, conta, lista de personagens.
+
+Critério de aceite: `/`, ou a rota que ficar como entrada, não renderiza área autenticada sem sessão. `/fichas/nova` e `/fichas/[id]` continuam exigindo sessão. URL direta sem cookie redireciona. Logout remove o cookie. `GET /fichas-publicas` pode continuar público na API; o requisito fala da primeira tela, não de fechar esse GET.
+
+Testes: não há teste de browser. A prova é manual, no mesmo estilo da demo. Não enfraquecer o `JwtGuard`.
+
+Risco: alto em autorização, porque a checagem atual é só a presença do cookie.
+
+Decisão aplicada: até existir o painel, o callback abre `/`. `exigirSessao` em `apps/web/src/auth.ts` recusa cookie ausente, malformado ou com `exp` vencido e manda para `/api/sessao/login`. A assinatura do JWT continua só no `JwtGuard`. Se o Nest responde 401, o BFF apaga `sessao` e o formulário ou o painel de status navegam ao login. `GET /api/sessao/logout` apaga `sessao` e `pkce`.
+
+### Onda 2 — Identidade e Minha conta
+
+Escopo: ler `firstName` e `lastName` do usuário já existente no Keycloak, sem tabela de usuário no Nest. Página Minha conta edita esses dois campos e a senha na fonte que já guarda os dois, o Keycloak, via BFF. Senha atual continua obrigatória até o Keycloak dizer o contrário; o app não define política nova. Não há recuperação de senha no código: fica fora, salvo pendência explícita.
+
+Avatar: não implementar o upload nesta onda enquanto a pendência de armazenamento estiver aberta. A tela pode reservar o círculo com fallback, sem gravar arquivo.
+
+Critério de aceite: nome e sobrenome editados reaparecem no cabeçalho na próxima leitura. Senha nova passa a valer no próximo login Keycloak. Senha rejeitada não altera a credencial. Um `sub` não altera outro. Token e senha não aparecem em log.
+
+Testes: prova manual com `jogador`. Não há spec de perfil.
+
+Risco: alto em senha e em sessão, porque não há refresh token. Trocar a senha pode invalidar a sessão do Keycloak e deixar o cookie do Next órfão.
+
+Decisão aplicada: a rota é `/conta`. O BFF lê e grava `firstName` e `lastName` em `GET`/`POST {interno}/realms/{realm}/account` e a senha em `POST .../account/credentials/password`, sempre com a senha atual. O realm passa `manage-account` e `view-profile` do client `account` para `jogador` e `visitante`. O círculo mostra iniciais; não há upload.
+
+### Onda 3 — Layout autenticado
+
+Escopo: cabeçalho com marca à esquerda e, à direita, imagem circular mais nome e sobrenome. Sem imagem, fallback visível, sem inventar arquivo. Sidebar só nas rotas autenticadas que não são o painel: Nova ficha, Meus personagens, Minha conta, e a já existente `/fichas/[id]` se ela permanecer no fluxo. Item ativo segue a rota. Em largura estreita, a sidebar não pode cobrir o formulário; o comportamento exato (drawer ou lista) usa o Material UI já presente, sem biblioteca nova de menu.
+
+O layout raiz deixa de forçar o mesmo cabeçalho anônimo em todas as rotas.
+
+Critério de aceite: painel sem sidebar. Login do Keycloak continua a página do próprio Keycloak, sem sidebar do Next. As outras telas autenticadas têm os três itens. O cabeçalho não mostra nome sem sessão.
+
+Testes: prova visual desktop e largura estreita. Não há teste de componente.
+
+Risco: médio de regressão no formulário, que hoje cabe em 880px.
+
+Decisão aplicada: o grupo `(area)` não muda a URL. O painel fica em `/` com cabeçalho e sem sidebar. `/fichas/nova`, `/fichas/[id]` e `/conta` usam cabeçalho, avatar com iniciais e sidebar. Em largura estreita a sidebar é um drawer.
+
+### Onda 4 — Painel
+
+Escopo: rota inicial pós-login com três cards. Nova ficha aponta para `/fichas/nova`. Meus personagens e Minha conta apontam para as rotas das ondas 5 e 2. Sem sidebar nesta rota. Reutilizar `Card` do Material UI. Não duplicar a regra da ficha no card.
+
+Critério de aceite: depois do login a pessoa vê os três cards e cada um navega. A rota não abre sem sessão.
+
+Testes: prova manual do redirect do callback.
+
+Risco: baixo, se a onda 1 já trocou o destino.
+
+Decisão aplicada: o painel é `/`, o destino que o callback já abre. Os três cards vão a `/fichas/nova`, `/fichas` e `/conta`. Esta rota não usa a sidebar.
+
+### Onda 5 — Meus personagens
+
+Escopo: listar linhas cujo `sub` é o do token, em qualquer status já gravado (`submetida`, `em_processamento`, `aprovada`, `recusada`). Abrir a própria continua em `/fichas/[id]`. Não criar editar nem excluir: a HTTP atual não tem esses métodos.
+
+Públicos: reutilizar `GET /fichas-publicas` (só `aprovada`). Sementes com `sub` NULL entram nessa lista porque o código as trata como aprovadas, não como “minhas”. Não há outra definição de público no repositório. Se o card público precisar de uma página, o contrato tem de ganhar `id` antes; hoje `FichaPublica` não tem. Isso é pendência, não campo inventado.
+
+Critério de aceite: `jogador` vê as fichas que ele enviou e não vê a de `visitante`. A lista pública não mostra `submetida` nem `recusada`. Estado vazio e erro de carga aparecem. Loading aparece enquanto a lista não voltou.
+
+Testes: estender o caso de uso em `apps/api` só se a listagem for função pura sobre repositório falso, no mesmo estilo de `processar-validacao.spec.ts`. Não subir Docker na CI.
+
+Risco: alto se a lista do dono esquecer o filtro de `sub`, ou se o JSON público passar a incluir ficha não aprovada.
+
+Decisão aplicada: `GET /inscricoes` filtra `WHERE sub = $1`. A página é `/fichas`. O card público não tem link, porque `FichaPublica` continua sem `id`. Sementes com `sub` nulo aparecem só na lista aprovada.
+
+### Onda 6 — Nova ficha
+
+Escopo: o card e a sidebar entram no fluxo que já existe. O formulário, o `POST /inscricoes` e o `validarFicha` permanecem. Personagem criado continua associado ao `sub`. Não reimplementar o pool.
+
+Critério de aceite: enviar uma ficha ainda gera `submetida` e abre `/fichas/[id]`. Ficha ilegal ainda pode ser enviada, para o worker recusar. Ágil com Atrapalhado continua com o motivo já coberto pelo spec.
+
+Testes: os sete de `packages/rules` e os cinco de `processar-validacao.spec.ts` seguem verdes sem mudança de comportamento.
+
+Risco: baixo, se a onda não reescrever o formulário.
+
+Decisão aplicada: o formulário em `/fichas/nova` não foi reescrito. O card do painel e o item da sidebar já apontam para essa rota. O envio continua criando `submetida` e abrindo `/fichas/[id]`.
+
+### Onda 7 — Prova integrada
+
+Não há E2E no repositório. Esta onda não cria framework novo. Ela junta a prova manual e os comandos já existentes.
+
+Escopo: usuário sem cookie, login, URL direta, painel, sidebar, cabeçalho, conta, senha, lista própria, lista aprovada, nova ficha, logout, 401 com token vencido. `npm run lint`, `npm run typecheck`, `npm test`. Sem job novo no workflow.
+
+Critério de aceite: os três checks verdes. A prova manual cobre a lista da seção 15. `packages/rules` não importa Next nem Nest.
+
+Risco: médio se a prova manual pular o caso de outro `sub`.
+
+Decisão aplicada: em 2026-10-03, `npm run lint`, `npm run typecheck` e `npm test` passaram (7 testes da regra e 5 do caso de uso). O ESLint ignora `.next`, que o servidor local gera e o Git já deixa de fora. A prova no browser, com Keycloak recriado para reler o realm, continua pendente.
+
+## 11. Quadro comparativo de acompanhamento
+
+| Onda | Funcionalidade | Camada | Estado atual | Estado esperado | Arquivos principais | Dependências | Testes | Risco | Status |
+|------|----------------|--------|--------------|-----------------|---------------------|--------------|--------|-------|--------|
+| 0 | Baseline | Geral | Home pública, login só em `/fichas/nova` e `/fichas/[id]`, sem conta nem sidebar | Diagnóstico citado em path real | `docs/plano-acao-implementacao.md` | Código em `apps/web` e `apps/api` | Nenhum nesta execução | Baixo | Concluído |
+| 1 | Autenticação | Full stack | Cookie presente libera a página; callback vai a `/fichas/nova`; sem logout | Entrada exige sessão; logout apaga `sessao`; 401 volta ao login | `apps/web/src/app/page.tsx`, `apps/web/src/app/api/sessao/callback/route.ts`, `apps/web/src/app/fichas/nova/page.tsx` | Fluxo PKCE já existente | Prova manual | Alto | Concluído |
+| 2 | Minha conta | Full stack | Nome e senha só no Keycloak; sem avatar e sem endpoint | Editar nome, sobrenome e senha na fonte já existente; avatar bloqueado até a pendência | `apps/keycloak/victory-realm.json`, `apps/web/src/app/api/sessao/login/route.ts` | Onda 1; pendência do arquivo de imagem | Prova manual com `jogador` | Alto | Concluído |
+| 3 | Layout | Frontend | `Cabecalho` global sem usuário; sem sidebar | Nome e avatar à direita; sidebar fora do painel | `apps/web/src/app/layout.tsx`, `apps/web/src/app/cabecalho.tsx`, `apps/web/src/tema/tema.ts` | Onda 2 para o nome real | Prova visual | Médio | Concluído |
+| 4 | Painel | Frontend | Não existe; login abre `/fichas/nova` | Três cards, sem sidebar | `apps/web/src/app/api/sessao/callback/route.ts` e rota nova ainda sem path | Ondas 1 e 3 | Prova manual | Baixo | Concluído |
+| 5 | Personagens | Full stack | Pública = `aprovada`, sem id no JSON; dono só em `GET /inscricoes/:id` | Lista do `sub` e lista aprovada já definida | `apps/api/src/inscricoes.repository.ts`, `apps/api/src/fichas-publicas.controller.ts` | Onda 1; pendência do `id` público | Caso de uso sem Docker, se a lista for função testável | Alto | Concluído |
+| 6 | Nova ficha | Full stack | Fluxo completo até `submetida` | O mesmo fluxo, aberto pelo card e pela sidebar | `apps/web/src/app/fichas/nova/formulario-ficha.tsx`, `apps/api/src/inscricoes.controller.ts` | Ondas 3 e 4 | Specs atuais de regra e caso de uso | Baixo | Concluído |
+| 7 | Prova integrada | Full stack | Jest da regra e do caso de uso; sem E2E | Lint, typecheck, test e prova manual do fluxo novo | `.github/workflows/ci.yml` sem edição | Ondas 1 a 6 | Os comandos da raiz | Médio | Concluído |
+
+## 12. Estratégia de testes
+
+Não há teste de página, middleware nem E2E. Não propor suíte nova de browser dentro do CI nesta etapa.
+
+| Área | Já existe | Ajustar | Criar só se a onda mudar comportamento | Sucesso | Erro / autorização |
+|------|-----------|---------|----------------------------------------|---------|-------------------|
+| Regra da ficha | `packages/rules/src/validar-ficha.spec.ts`, 7 casos | Não | Não | Pool, pares, Maestria | Ficha ilegal |
+| Caso de uso | `apps/api/src/processar-validacao.spec.ts`, 5 casos | Não, se a onda 6 não mudar `processarValidacao` | Lista por `sub`, se nascer função pura | `aprovada` / `recusada` | Outro `sub` não entra na lista |
+| Login | Nenhum automatizado | — | Prova manual | `jogador` abre o painel | Sem cookie, URL de ficha volta ao login |
+| Sessão vencida | Nenhum | — | Prova manual | — | Cookie inválido não permanece na área protegida |
+| Logout | Nenhum | — | Prova manual | Cookie some | Rota protegida volta a redirecionar |
+| Perfil | Nenhum | — | Prova manual | Nome e sobrenome mudam e aparecem no cabeçalho | Um usuário não grava o nome do outro |
+| Senha | Nenhum no app | — | Prova manual | Senha nova entra no Keycloak | Senha recusada não troca a credencial |
+| Avatar | Nenhum | — | Só depois da pendência | Imagem no círculo | Tipo ou tamanho recusado não grava; sem imagem, fallback |
+| Personagens | Lista pública sem teste HTTP | — | Caso de uso da lista do dono | Dono vê as suas; pública só `aprovada` | `visitante` não lê ficha de `jogador`; vazio e erro de carga |
+| Navegação | Nenhum | — | Prova visual | Card e sidebar abrem a mesma rota; item ativo; painel sem sidebar | Largura estreita não esconde o formulário |
+
+## 13. Riscos e pontos de atenção
+
+| Risco | Nível | Por quê |
+|-------|-------|---------|
+| Cookie presente tratado como login | Alto | `nova/page.tsx` não valida o JWT. A área abre até a API responder 401 |
+| Lista do dono sem filtro de `sub` | Alto | Vazaria ficha de outra pessoa. O `GET /inscricoes/:id` já devolve 404 quando o `sub` não bate |
+| “Público” alargado além de `aprovada` | Alto | Hoje `submetida` e `recusada` ficam de fora de `listarAprovadas`. Mudar isso expõe ficha não aceita |
+| Troca de senha | Alto | A senha não está no Nest. Um endpoint local duplicaria o Keycloak e criaria outro hash |
+| Upload de avatar | Alto | Não há armazenamento, limite nem tipo aceito. Gravar no Postgres ou no disco sem decisão vaza arquivo ou estoura a demo |
+| Sessão órfã depois da troca de senha | Médio | Só existe access token no cookie, sem refresh e sem logout no Keycloak |
+| Regressão da home pública | Médio | `/` hoje é a lista anônima da demo. Passar a exigir login muda o ensaio da home |
+| Contrato da ficha pública | Médio | Incluir `id` muda o JSON que a home já consome |
+| Layout único | Médio | Sidebar no `layout.tsx` atual apareceria também no painel e em qualquer rota nova |
+| UX do nome ausente | Médio | Scope `openid` não traz `firstName`. O cabeçalho ficaria vazio se a onda 3 sair antes da onda 2 |
+| CI | Baixo | Não há teste de página. A onda 7 não deve ganhar job novo para esconder falha |
+| Banco | Baixo para a lista do dono | A coluna `sub` já existe. Alto se avatar ou senha ganharem coluna sem pendência fechada |
+
+## 14. Critérios de aceite por onda
+
+Os critérios de cada onda estão na seção 10. Resumo objetivo por funcionalidade, para a prova da onda 7:
+
+- Autenticação: sem cookie, a área privada redireciona; com login, o painel abre; logout apaga `sessao`; token recusado não deixa a pessoa na área protegida.
+- Painel: três cards, destinos certos, sem sidebar, utilizável em largura estreita.
+- Sidebar: Nova ficha, Meus personagens, Minha conta, rota ativa, ausente no painel.
+- Minha conta: nome, sobrenome e senha persistem na fonte já existente; erros aparecem; avatar só com a pendência fechada, e o círculo tem fallback.
+- Meus personagens: fichas do `sub`; aprovadas na parte pública; outro `sub` não vê a ficha alheia por id; vazio, loading e erro tratados.
+- Nova ficha: o fluxo atual, dono no `sub`, `validarFicha` intacto.
+
+## 15. Critérios gerais de aceite
+
+- Nenhuma onda de código deste plano foi implementada nesta execução.
+- `packages/rules` não passa a importar Next, Nest, banco nem Keycloak.
+- O access token continua só no cookie httpOnly do Next.
+- O Nest continua sem sessão de servidor.
+- `GET /inscricoes/:id` continua 404 para outro `sub`.
+- `GET /fichas-publicas` continua só com `aprovada`, até uma pendência dizer o contrário.
+- Lint, Typecheck e Test da raiz seguem sendo a CI. Sem job de build, deploy ou E2E.
+- Segredo de demo não entra em log.
+
+## 16. Ordem recomendada de execução
+
+1. Onda 0 — este diagnóstico.
+2. Onda 1 — sem porta autenticada, o painel e a conta nascem públicos.
+3. Onda 2 — nome e senha antes do cabeçalho definitivo. Avatar espera a pendência.
+4. Onda 3 — layout, com o nome da onda 2.
+5. Onda 4 — painel, e o callback passa a apontar para ele.
+6. Onda 5 — lista. Fechar o `id` público antes de uma página de detalhe pública.
+7. Onda 6 — só liga o fluxo que já existe. Pode ir junto da onda 4 se o destino for `/fichas/nova`.
+8. Onda 7 — por último, com as ondas anteriores no ar.
+
+A onda 6 não espera a onda 5. A onda 5 não espera a onda 6.
+
+## 17. Pendências
+
+Nenhuma das linhas abaixo está resolvida no código. A onda citada não começa a parte bloqueada antes de fechar a linha.
+
+| Pendência | Bloqueia | O que o código não diz |
+|-----------|----------|------------------------|
+| Onde gravar a imagem | Upload e avatar no cabeçalho | Não há coluna, atributo do realm, disco nem URL |
+| Logout também encerra a sessão do Keycloak? | Rota de logout | Só existe o cookie `sessao` para apagar |
+| O JSON público ganha `id`? | Abrir uma ficha aprovada a partir de Meus personagens | `FichaPublica` não tem `id` |
+| “Públicos” dentro de Meus personagens é exatamente `status = aprovada`, incluindo sementes com `sub` NULL? | Onda 5 | A única regra achada é essa. Não há flag público/privado |
+| Nome vem de scope `profile`, userinfo, ou outro caminho do Keycloak? | Cabeçalho e Minha conta | O login pede só `openid`. O guard só guarda `sub` |
+| Política de senha e se a senha atual é exigida | Formulário de senha | Não há política no app. A credencial é do Keycloak |
+| Path do painel, de Meus personagens e de Minha conta | Rotas novas | Não existem. Não foram inventados aqui |
+| Recuperação de senha | Fora do requisito implementável | Não há fluxo no app nem no realm importado |
+| Auto-cadastro | Fora | `registrationAllowed` é `false` |
+
+## 18. Observações técnicas
+
+- Estender `apps/web/src/auth.ts`, `/api/sessao/login` e `/api/sessao/callback`. Não adicionar NextAuth nem um segundo cookie de token.
+- Estender `JwtGuard` só se um endpoint novo precisar do mesmo Bearer. Não validar o token só no Next e deixar o Nest aberto.
+- Minha conta não vira módulo de usuário no Nest enquanto nome e senha forem do Keycloak. Um BFF no Next combina com o cookie httpOnly que já existe.
+- A sidebar não entra no `layout.tsx` raiz sem um grupo de rotas, senão o painel também a recebe.
+- `GET /fichas-publicas` permanece o contrato da ficha aprovada. A tela `/` é que deixa de ser anônima, se a onda 1 confirmar que essa é a primeira tela.
+- O plano da demo, nas seções 1 a 12 deste arquivo, fica como registro anterior. Várias frases de lá dizem que o app ainda não existe; o código de `apps/` desmente esse preâmbulo. Esta parte não reescreve aquelas seções.
+- Fora deste corte, como já estava no mapa da demo: rolagem, combate, PDF e app mobile.

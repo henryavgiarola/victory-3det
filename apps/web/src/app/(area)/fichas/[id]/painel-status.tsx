@@ -8,7 +8,7 @@ import Chip from "@mui/material/Chip";
 import LinearProgress from "@mui/material/LinearProgress";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { ROTULO_STATUS } from "../../../tema/rotulos";
+import { ROTULO_STATUS } from "../../../../tema/rotulos";
 
 interface Estado {
   status: string;
@@ -42,6 +42,10 @@ export function PainelStatus({ id }: { id: string }) {
         return;
       }
       if (!ativo) {
+        return;
+      }
+      if (http.status === 401) {
+        window.location.assign("/api/sessao/login");
         return;
       }
       if (!http.ok) {

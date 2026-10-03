@@ -48,7 +48,7 @@ export async function GET(requisicao: Request) {
     return falha;
   }
 
-  const destino = NextResponse.redirect(new URL("/fichas/nova", appUrl));
+  const destino = NextResponse.redirect(new URL("/", appUrl));
   destino.cookies.set("sessao", json.access_token, {
     httpOnly: true,
     sameSite: "lax",

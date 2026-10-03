@@ -29,7 +29,7 @@ import {
   ROTULO_DESVANTAGEM,
   ROTULO_PERICIA,
   ROTULO_VANTAGEM,
-} from "../../../tema/rotulos";
+} from "../../../../tema/rotulos";
 
 const VANTAGENS_SIMPLES = [
   "agil",
@@ -130,6 +130,10 @@ export function FormularioFicha() {
         body: JSON.stringify({ nome, conceito, ...ficha }),
       });
       const texto = await http.text();
+      if (http.status === 401) {
+        window.location.assign("/api/sessao/login");
+        return;
+      }
       if (!http.ok) {
         setEnviando(false);
         setResposta(`Erro ${http.status}`);
