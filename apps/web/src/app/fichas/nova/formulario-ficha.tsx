@@ -130,6 +130,10 @@ export function FormularioFicha() {
         body: JSON.stringify({ nome, conceito, ...ficha }),
       });
       const texto = await http.text();
+      if (http.status === 401) {
+        window.location.assign("/api/sessao/login");
+        return;
+      }
       if (!http.ok) {
         setEnviando(false);
         setResposta(`Erro ${http.status}`);

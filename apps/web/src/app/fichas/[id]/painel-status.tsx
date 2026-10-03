@@ -44,6 +44,10 @@ export function PainelStatus({ id }: { id: string }) {
       if (!ativo) {
         return;
       }
+      if (http.status === 401) {
+        window.location.assign("/api/sessao/login");
+        return;
+      }
       if (!http.ok) {
         setErro(http.status === 404 ? "Inscrição não encontrada." : `Erro ${http.status}`);
         return;

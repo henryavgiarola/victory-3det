@@ -4,11 +4,13 @@ import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { exigirSessao } from "../auth";
 import { listarFichasPublicas, type FichaPublica } from "../listar-fichas-publicas";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
+  await exigirSessao();
   let fichas: FichaPublica[] = [];
   let falha = false;
   try {

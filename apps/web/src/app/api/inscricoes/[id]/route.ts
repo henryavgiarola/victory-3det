@@ -1,4 +1,6 @@
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { limparSessao } from "../../../../auth";
 
 export async function GET(_requisicao: Request, contexto: { params: Promise<{ id: string }> }) {
   const { id } = await contexto.params;
@@ -6,7 +8,9 @@ export async function GET(_requisicao: Request, contexto: { params: Promise<{ id
   const token = jar.get("sessao")?.value;
   const api = process.env.API_URL;
   if (!token || !api) {
-    return new Response(null, { status: 401 });
+    const negado = new NextResponse(null, { status: 401 });
+    limparSessao(negado);
+    return negado;
   }
 
   const resposta = await fetch(new URL(`/inscricoes/${id}`, api), {
@@ -18,5 +22,11 @@ export async function GET(_requisicao: Request, contexto: { params: Promise<{ id
   if (correlationId) {
     headers.set("x-correlation-id", correlationId);
   }
-  return new Response(await resposta.text(), { status: resposta.status, headers });
+  const corpo = await resposta.text();
+  if (resposta.status === 401) {
+    const negado = new NextResponse(corpo, { status: 401, headers });
+    limparSessao(negado);
+    return negado;
+  }
+  return new Response(corpo, { status: resposta.status, headers });
 }

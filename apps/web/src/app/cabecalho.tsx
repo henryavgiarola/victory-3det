@@ -19,6 +19,9 @@ export function Cabecalho() {
         >
           Victory
         </Typography>
+        <Button component={Link} href="/api/sessao/logout" color="inherit">
+          Sair
+        </Button>
         <Button component={Link} href="/fichas/nova" color="warning" variant="contained" startIcon={<AddIcon />}>
           Nova ficha
         </Button>
