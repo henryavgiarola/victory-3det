@@ -692,6 +692,8 @@ Testes: prova manual com `jogador`. Não há spec de perfil.
 
 Risco: alto em senha e em sessão, porque não há refresh token. Trocar a senha pode invalidar a sessão do Keycloak e deixar o cookie do Next órfão.
 
+Decisão aplicada: a rota é `/conta`. O BFF lê e grava `firstName` e `lastName` em `GET`/`POST {interno}/realms/{realm}/account` e a senha em `POST .../account/credentials/password`, sempre com a senha atual. O realm passa `manage-account` e `view-profile` do client `account` para `jogador` e `visitante`. O círculo mostra iniciais; não há upload.
+
 ### Onda 3 — Layout autenticado
 
 Escopo: cabeçalho com marca à esquerda e, à direita, imagem circular mais nome e sobrenome. Sem imagem, fallback visível, sem inventar arquivo. Sidebar só nas rotas autenticadas que não são o painel: Nova ficha, Meus personagens, Minha conta, e a já existente `/fichas/[id]` se ela permanecer no fluxo. Item ativo segue a rota. Em largura estreita, a sidebar não pode cobrir o formulário; o comportamento exato (drawer ou lista) usa o Material UI já presente, sem biblioteca nova de menu.
@@ -752,7 +754,7 @@ Risco: médio se a prova manual pular o caso de outro `sub`.
 |------|----------------|--------|--------------|-----------------|---------------------|--------------|--------|-------|--------|
 | 0 | Baseline | Geral | Home pública, login só em `/fichas/nova` e `/fichas/[id]`, sem conta nem sidebar | Diagnóstico citado em path real | `docs/plano-acao-implementacao.md` | Código em `apps/web` e `apps/api` | Nenhum nesta execução | Baixo | Concluído |
 | 1 | Autenticação | Full stack | Cookie presente libera a página; callback vai a `/fichas/nova`; sem logout | Entrada exige sessão; logout apaga `sessao`; 401 volta ao login | `apps/web/src/app/page.tsx`, `apps/web/src/app/api/sessao/callback/route.ts`, `apps/web/src/app/fichas/nova/page.tsx` | Fluxo PKCE já existente | Prova manual | Alto | Concluído |
-| 2 | Minha conta | Full stack | Nome e senha só no Keycloak; sem avatar e sem endpoint | Editar nome, sobrenome e senha na fonte já existente; avatar bloqueado até a pendência | `apps/keycloak/victory-realm.json`, `apps/web/src/app/api/sessao/login/route.ts` | Onda 1; pendência do arquivo de imagem | Prova manual com `jogador` | Alto | Não iniciado |
+| 2 | Minha conta | Full stack | Nome e senha só no Keycloak; sem avatar e sem endpoint | Editar nome, sobrenome e senha na fonte já existente; avatar bloqueado até a pendência | `apps/keycloak/victory-realm.json`, `apps/web/src/app/api/sessao/login/route.ts` | Onda 1; pendência do arquivo de imagem | Prova manual com `jogador` | Alto | Concluído |
 | 3 | Layout | Frontend | `Cabecalho` global sem usuário; sem sidebar | Nome e avatar à direita; sidebar fora do painel | `apps/web/src/app/layout.tsx`, `apps/web/src/app/cabecalho.tsx`, `apps/web/src/tema/tema.ts` | Onda 2 para o nome real | Prova visual | Médio | Não iniciado |
 | 4 | Painel | Frontend | Não existe; login abre `/fichas/nova` | Três cards, sem sidebar | `apps/web/src/app/api/sessao/callback/route.ts` e rota nova ainda sem path | Ondas 1 e 3 | Prova manual | Baixo | Não iniciado |
 | 5 | Personagens | Full stack | Pública = `aprovada`, sem id no JSON; dono só em `GET /inscricoes/:id` | Lista do `sub` e lista aprovada já definida | `apps/api/src/inscricoes.repository.ts`, `apps/api/src/fichas-publicas.controller.ts` | Onda 1; pendência do `id` público | Caso de uso sem Docker, se a lista for função testável | Alto | Não iniciado |
