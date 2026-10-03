@@ -975,4 +975,4 @@ A prova no browser do login, da conta e das duas listas ficou para depois de rec
 
 # 6. Próximo passo
 
-Este registro entra no mesmo incremento. `feature/sessao-na-entrada` segue para `development` por squash. `main` recebe o conjunto na release `0.5.0`, com merge commit, tag anotada `v0.5.0` e a volta para `development`.
+Este registro entra no mesmo incremento. O pull request https://github.com/henryavgiarola/victory-3det/pull/23 leva `feature/sessao-na-entrada` para `development` por squash. `main` recebe o conjunto na release `0.5.0`, com merge commit, tag anotada `v0.5.0` e a volta para `development`.
