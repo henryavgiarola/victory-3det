@@ -732,6 +732,8 @@ Testes: estender o caso de uso em `apps/api` só se a listagem for função pura
 
 Risco: alto se a lista do dono esquecer o filtro de `sub`, ou se o JSON público passar a incluir ficha não aprovada.
 
+Decisão aplicada: `GET /inscricoes` filtra `WHERE sub = $1`. A página é `/fichas`. O card público não tem link, porque `FichaPublica` continua sem `id`. Sementes com `sub` nulo aparecem só na lista aprovada.
+
 ### Onda 6 — Nova ficha
 
 Escopo: o card e a sidebar entram no fluxo que já existe. O formulário, o `POST /inscricoes` e o `validarFicha` permanecem. Personagem criado continua associado ao `sub`. Não reimplementar o pool.
@@ -761,7 +763,7 @@ Risco: médio se a prova manual pular o caso de outro `sub`.
 | 2 | Minha conta | Full stack | Nome e senha só no Keycloak; sem avatar e sem endpoint | Editar nome, sobrenome e senha na fonte já existente; avatar bloqueado até a pendência | `apps/keycloak/victory-realm.json`, `apps/web/src/app/api/sessao/login/route.ts` | Onda 1; pendência do arquivo de imagem | Prova manual com `jogador` | Alto | Concluído |
 | 3 | Layout | Frontend | `Cabecalho` global sem usuário; sem sidebar | Nome e avatar à direita; sidebar fora do painel | `apps/web/src/app/layout.tsx`, `apps/web/src/app/cabecalho.tsx`, `apps/web/src/tema/tema.ts` | Onda 2 para o nome real | Prova visual | Médio | Concluído |
 | 4 | Painel | Frontend | Não existe; login abre `/fichas/nova` | Três cards, sem sidebar | `apps/web/src/app/api/sessao/callback/route.ts` e rota nova ainda sem path | Ondas 1 e 3 | Prova manual | Baixo | Concluído |
-| 5 | Personagens | Full stack | Pública = `aprovada`, sem id no JSON; dono só em `GET /inscricoes/:id` | Lista do `sub` e lista aprovada já definida | `apps/api/src/inscricoes.repository.ts`, `apps/api/src/fichas-publicas.controller.ts` | Onda 1; pendência do `id` público | Caso de uso sem Docker, se a lista for função testável | Alto | Não iniciado |
+| 5 | Personagens | Full stack | Pública = `aprovada`, sem id no JSON; dono só em `GET /inscricoes/:id` | Lista do `sub` e lista aprovada já definida | `apps/api/src/inscricoes.repository.ts`, `apps/api/src/fichas-publicas.controller.ts` | Onda 1; pendência do `id` público | Caso de uso sem Docker, se a lista for função testável | Alto | Concluído |
 | 6 | Nova ficha | Full stack | Fluxo completo até `submetida` | O mesmo fluxo, aberto pelo card e pela sidebar | `apps/web/src/app/fichas/nova/formulario-ficha.tsx`, `apps/api/src/inscricoes.controller.ts` | Ondas 3 e 4 | Specs atuais de regra e caso de uso | Baixo | Não iniciado |
 | 7 | Prova integrada | Full stack | Jest da regra e do caso de uso; sem E2E | Lint, typecheck, test e prova manual do fluxo novo | `.github/workflows/ci.yml` sem edição | Ondas 1 a 6 | Os comandos da raiz | Médio | Não iniciado |
 

@@ -67,6 +67,16 @@ export class InscricoesController {
     return { id, status: "submetida" as const };
   }
 
+  @Get("inscricoes")
+  @UseGuards(JwtGuard)
+  async listar(@Req() requisicao: RequisicaoAutenticada) {
+    const sub = requisicao.usuario?.sub;
+    if (!sub) {
+      throw new NotFoundException();
+    }
+    return this.inscricoes.listarDoDono(sub);
+  }
+
   @Get("inscricoes/:id")
   @UseGuards(JwtGuard)
   async ler(
