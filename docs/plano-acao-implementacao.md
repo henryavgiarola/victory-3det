@@ -756,6 +756,8 @@ Critério de aceite: os três checks verdes. A prova manual cobre a lista da se�
 
 Risco: médio se a prova manual pular o caso de outro `sub`.
 
+Decisão aplicada: em 2026-10-03, `npm run lint`, `npm run typecheck` e `npm test` passaram (7 testes da regra e 5 do caso de uso). O ESLint ignora `.next`, que o servidor local gera e o Git já deixa de fora. A prova no browser, com Keycloak recriado para reler o realm, continua pendente.
+
 ## 11. Quadro comparativo de acompanhamento
 
 | Onda | Funcionalidade | Camada | Estado atual | Estado esperado | Arquivos principais | Dependências | Testes | Risco | Status |
@@ -767,7 +769,7 @@ Risco: médio se a prova manual pular o caso de outro `sub`.
 | 4 | Painel | Frontend | Não existe; login abre `/fichas/nova` | Três cards, sem sidebar | `apps/web/src/app/api/sessao/callback/route.ts` e rota nova ainda sem path | Ondas 1 e 3 | Prova manual | Baixo | Concluído |
 | 5 | Personagens | Full stack | Pública = `aprovada`, sem id no JSON; dono só em `GET /inscricoes/:id` | Lista do `sub` e lista aprovada já definida | `apps/api/src/inscricoes.repository.ts`, `apps/api/src/fichas-publicas.controller.ts` | Onda 1; pendência do `id` público | Caso de uso sem Docker, se a lista for função testável | Alto | Concluído |
 | 6 | Nova ficha | Full stack | Fluxo completo até `submetida` | O mesmo fluxo, aberto pelo card e pela sidebar | `apps/web/src/app/fichas/nova/formulario-ficha.tsx`, `apps/api/src/inscricoes.controller.ts` | Ondas 3 e 4 | Specs atuais de regra e caso de uso | Baixo | Concluído |
-| 7 | Prova integrada | Full stack | Jest da regra e do caso de uso; sem E2E | Lint, typecheck, test e prova manual do fluxo novo | `.github/workflows/ci.yml` sem edição | Ondas 1 a 6 | Os comandos da raiz | Médio | Não iniciado |
+| 7 | Prova integrada | Full stack | Jest da regra e do caso de uso; sem E2E | Lint, typecheck, test e prova manual do fluxo novo | `.github/workflows/ci.yml` sem edição | Ondas 1 a 6 | Os comandos da raiz | Médio | Concluído |
 
 ## 12. Estratégia de testes
 
