@@ -4,9 +4,9 @@ import CardContent from "@mui/material/CardContent";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { listarFichasPublicas, type FichaPublica } from "../../../../listar-fichas-publicas";
-import { listarMinhasFichas, type ResumoInscricao } from "../../../../listar-minhas-fichas";
-import { ROTULO_STATUS } from "../../../../tema/rotulos";
+import { listarFichasPublicas, type FichaPublica } from "../../../listar-fichas-publicas";
+import { listarMinhasFichas, type ResumoInscricao } from "../../../listar-minhas-fichas";
+import { ROTULO_STATUS } from "../../../tema/rotulos";
 import { CartaoMinhaFicha } from "./cartao-minha-ficha";
 
 export async function ListasDeFichas() {
