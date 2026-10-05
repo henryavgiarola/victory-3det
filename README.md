@@ -9,7 +9,7 @@ Todo push e todo pull request dispara três checks no GitHub Actions. Os três p
 | --- | --- | --- |
 | Lint | `npm run lint` | ESLint no TypeScript |
 | Typecheck | `npm run typecheck` | `tsc --noEmit` sem emitir arquivo |
-| Test | `npm test` | Regra da ficha e o caso de uso da inscrição, sem banco, fila nem Keycloak |
+| Test | `npm test` | Regra da ficha, o caso de uso da inscrição e a sugestão, sem banco, fila, Keycloak nem Ollama |
 
 ```bash
 npm ci
@@ -28,13 +28,15 @@ O corte da demo e as fronteiras entre a regra, o Next e o Nest estão em `docs/`
 
 ## Demo
 
-`docker compose up --build` sobe o browser em `http://localhost:3001`, a API em `http://localhost:3000` e o Keycloak em `http://localhost:8080`. Postgres e Redis não publicam porta no host. Os três checks acima não sobem esse Compose.
+`docker compose up --build` sobe o browser em `http://localhost:3001`, a API em `http://localhost:3000`, o Keycloak em `http://localhost:8080` e o Ollama em `http://localhost:11434`. Postgres e Redis não publicam porta no host. Os três checks acima não sobem esse Compose.
 
 ```text
 browser
   │
   ▼
 Next (sessão httpOnly, PKCE)
+  ├── Ollama          sugestão de ficha, sem gravar inscrição
+  │
   │  Authorization: Bearer
   ▼
 Nest (JWT via JWKS)
@@ -51,13 +53,51 @@ A matemática fica só em `packages/rules`. O Next e o Nest chamam `validarFicha
 | --- | --- | --- |
 | Painel | `/` | Sem o cookie `sessao`, o Next redireciona ao Keycloak. Com sessão, três cards e sem sidebar |
 | Login | Keycloak | Usuário `jogador`, senha `jogador`. Sair apaga os cookies `sessao` e `pkce` |
-| Nova ficha | `/fichas/nova` | O formulário chama `validarFicha`. O envio cria `submetida` |
+| Nova ficha | `/fichas/nova` | Uma descrição pede sugestão ao Ollama. O formulário chama `validarFicha`. O envio cria `submetida` |
 | Personagens | `/fichas` | As fichas deste `sub`, em qualquer status, e as `aprovada` |
 | Conta | `/conta` | Nome, sobrenome e senha ficam no Keycloak. O círculo mostra as iniciais |
 | Inscrição | `POST /inscricoes` | 201 `submetida`. O Nest grava o `sub` do token, publica `validar-ficha` e devolve `x-correlation-id` |
 | Status | `/fichas/:id` | `em_processamento`, depois `aprovada` ou `recusada` com os motivos. Outro `sub` recebe 404 |
 
-O worker, no mesmo processo da API, é quem grava `aprovada` ou `recusada`. Rolagem, combate, PDF e mobile ficam de fora.
+O worker, no mesmo processo da API, é quem grava `aprovada` ou `recusada`. O navegador não fala com o modelo: só o Next chama o Ollama. Rolagem, combate, PDF e mobile ficam de fora.
+
+## Como rodar
+
+É preciso Node.js 22 ou mais recente, npm, Git e Docker com Compose.
+
+1. Baixe o repositório e entre na pasta.
+
+```bash
+git clone https://github.com/henryavgiarola/victory-3det.git
+cd victory-3det
+```
+
+2. Rode os três checks. Eles não sobem o Compose.
+
+```bash
+npm ci
+npm run lint
+npm run typecheck
+npm test
+```
+
+3. Suba a aplicação. Na primeira vez o Keycloak demora para ficar saudável; o web espera isso.
+
+```bash
+docker compose up --build -d
+```
+
+4. Baixe o modelo uma vez. A imagem do Ollama não traz o `qwen2.5:1.5b`. O volume `ollama` guarda o arquivo, então recriar o container não baixa de novo.
+
+```bash
+docker compose exec ollama ollama pull qwen2.5:1.5b
+```
+
+5. Abra `http://localhost:3001`. Entre com `jogador` e senha `jogador`. A API fica em `http://localhost:3000` e o Keycloak em `http://localhost:8080`.
+
+Em `/fichas/nova`, escreva uma descrição e use Sugerir. O envio da inscrição continua no botão Enviar. Se o modelo estiver fora, o formulário avisa e segue usável.
+
+As variáveis do Compose já estão no `docker-compose.yml`. O `.env.example` serve para rodar os apps no host, sem o container do web.
 
 # Processo de criação do projeto
 
@@ -976,3 +1016,47 @@ A prova no browser do login, da conta e das duas listas ficou para depois de rec
 # 6. Próximo passo
 
 Este registro entra no mesmo incremento. O pull request https://github.com/henryavgiarola/victory-3det/pull/23 leva `feature/sessao-na-entrada` para `development` por squash. `main` recebe o conjunto na release `0.5.0`, com merge commit, tag anotada `v0.5.0` e a volta para `development`.
+
+# Dia 7 — Domingo, 04/10/2026
+
+## Sugestão de ficha a partir de um texto
+
+O sétimo dia partiu de `development` em `f5cf1ff`, a volta da release `v0.5.0`. A branch é `feature/sugestao-de-ficha`. A pessoa descreve um personagem. O Next pede uma ficha ao Ollama, na máquina, e `validarFicha` continua sendo a única conta. A sugestão não cria a inscrição. O Nest não ganhou rota. `.github/workflows/ci.yml` não mudou. O plano está no apêndice de `docs/plano-acao-implementacao.md`.
+
+---
+
+# 1. Leitura do JSON
+
+`interpretarSugestao`, em `apps/web/src/interpretar-sugestao.ts`, recebe um valor desconhecido e só monta uma `Ficha` com os códigos de `packages/rules/src/ficha.ts`. Campo a mais, JSON quebrado ou código desconhecido devolve `ficha: null` e um motivo de leitura, sem chamar a regra. Ficha bem formada, mesmo ilegal, segue para `validarFicha`. `@victory/web` ganhou script `test`, que compila a regra e roda o Jest. O `npm test` da raiz passou a incluí-lo.
+
+---
+
+# 2. Ollama
+
+O Compose ganhou o serviço `ollama`, imagem `ollama/ollama:0.35.1`, volume `ollama` em `/root/.ollama` e `OLLAMA_NO_CLOUD=1`. A porta `11434` fica no host. O web recebe `OLLAMA_URL=http://ollama:11434` e `OLLAMA_MODEL=qwen2.5:1.5b`, sem depender desse serviço para subir. Sem essas variáveis, o restante do app continua subindo. O pull de `qwen2.5:1.5b` respondeu `{"ok": true}`. Recriar o container não baixou o modelo de novo. A CI não sobe esse serviço.
+
+---
+
+# 3. Rota
+
+`POST /api/sugestao` fica no Next. Sem cookie `sessao` utilizável, responde 401 e apaga `sessao` e `pkce`. A descrição vai aparada, com teto de 2000 caracteres. O pedido lista os códigos de perícia, vantagem e desvantagem. O JSON passa em `interpretarSugestao`. Se houver motivos, uma segunda chamada leva esses motivos. Não há terceira. Ficha bem formada responde 200, mesmo ilegal. Duas leituras sem ficha respondem 422 com os motivos. Modelo ausente ou fora responde 502. A rota não chama o Nest e não grava inscrição.
+
+---
+
+# 4. Formulário
+
+Em `/fichas/nova`, o campo Descrição e o botão Sugerir. Enquanto a resposta não volta, Sugerir e Enviar ficam desligados. `camposDaFicha` copia a ficha para os controles que já existiam. O formulário tem um ataque, uma defesa, um alcance, uma maestria e um código; entra o primeiro de cada um. Graus não têm campo. Nome e conceito não vêm da sugestão. Os motivos aparecem no alerta que `validarFicha` já usa. Uma ficha ilegal continua podendo ser enviada.
+
+---
+
+# 5. Prova
+
+`npm run lint`, `npm run typecheck` e `npm test` passaram. São os sete testes da regra, os cinco do caso de uso e os dezesseis do app web. Não há job novo.
+
+No browser, com o Next na máquina e o Keycloak no ar, uma descrição foi ao modelo e os motivos de leitura apareceram no alerta. Uma ficha aceita pela rota marcou Luta, Manha, Forte e Ataque especial, com pontos restantes zero. Ágil com Atrapalhado mostrou o motivo da regra, e Enviar continuou disponível. Web, API, Postgres e Redis não estavam no Compose nessa prova, então a contagem de linhas em `inscricoes` não foi refeita. A sugestão não chama `POST /inscricoes`.
+
+---
+
+# 6. Próximo passo
+
+Este registro entra no mesmo incremento. O próximo passo é o pull request de `feature/sugestao-de-ficha` para `development`, por squash. `main` só recebe o conjunto numa release, com merge commit, tag anotada e a volta para `development`.
