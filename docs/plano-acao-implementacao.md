@@ -865,3 +865,113 @@ Nenhuma das linhas abaixo está resolvida no código. A onda citada não começa
 - `GET /fichas-publicas` permanece o contrato da ficha aprovada. A tela `/` é que deixa de ser anônima, se a onda 1 confirmar que essa é a primeira tela.
 - O plano da demo, nas seções 1 a 12 deste arquivo, fica como registro anterior. Várias frases de lá dizem que o app ainda não existe; o código de `apps/` desmente esse preâmbulo. Esta parte não reescreve aquelas seções.
 - Fora deste corte, como já estava no mapa da demo: rolagem, combate, PDF e app mobile.
+
+---
+
+# Plano de Ação — Sugestão de ficha a partir de um texto
+
+Diagnóstico em 2026-10-04, na branch `feature/sugestao-de-ficha`, a partir de `origin/development` em `f5cf1ff` (tag `v0.5.0`). Este apêndice não reescreve as seções 1 a 18 acima.
+
+## 1. Objetivo
+
+A pessoa descreve um personagem em texto livre. A aplicação devolve uma `Ficha` para o formulário que já existe. `validarFicha` continua sendo a única conta. O envio continua manual: a sugestão não cria a inscrição.
+
+## 2. O que o código tem hoje
+
+| Peça | Onde | O que faz |
+|------|------|-----------|
+| Forma da ficha | `packages/rules/src/ficha.ts` | `poder`, `habilidade`, `resistencia`, `pericias`, `vantagens`, `desvantagens` |
+| Conta | `validarFicha` | Aceita ou devolve `motivos`. Não chama rede |
+| Formulário | `apps/web/src/app/(area)/fichas/nova/formulario-ficha.tsx` | Monta a ficha no cliente, chama `validarFicha`, envia mesmo se estiver ilegal |
+| Criação | `POST /api/inscricoes` e `POST /inscricoes` | Grava `submetida` e publica o job `{ id }` |
+| Sessão | Cookie `sessao` no Next; `JwtGuard` no Nest | A página `/fichas/nova` já exige sessão |
+| Modelo de linguagem | Não existe | Não há cliente, rota, variável nem serviço no Compose |
+
+O Compose sobe web, API, Postgres, Redis e Keycloak. A CI é Lint, Typecheck e Test, sem Docker.
+
+## 3. Decisão
+
+O modelo roda na máquina, via Ollama, sem chave e sem provedor pago. O Next, no servidor, chama o Ollama. O navegador não fala com o modelo. `packages/rules` não importa cliente HTTP. O Nest não ganha rota de sugestão: ele continua recebendo a ficha só no `POST /inscricoes`, depois que a pessoa envia.
+
+Cota gratuita de Gemini, Groq ou OpenRouter fica fora. Trocar o Ollama por um desses é decisão nova, não esta leva.
+
+O nome exato do modelo não está no repositório. A onda que sobe o container escolhe um modelo pequeno já capaz de responder JSON e grava a tag no Compose depois que um pull local funcionar. Até lá, a tag é pendência, não fato.
+
+## 4. Contrato
+
+`POST /api/sugestao`
+
+| | |
+|--|--|
+| Auth | Cookie `sessao` utilizável. Sem cookie, ou com Nest fora desta rota: 401 e limpeza de `sessao` e `pkce`, no mesmo padrão de `/api/inscricoes` |
+| Body | `{ descricao: string }` não vazia, com teto de tamanho definido na implementação |
+| Sucesso | `{ ficha: Ficha, motivos: string[] }`. `motivos` vazio significa que `validarFicha` aceitou |
+| Modelo fora | 502 com mensagem genérica. O formulário de envio continua usável |
+| Log | Não grava token, cookie nem senha. A descrição não precisa ir para o log |
+
+Não há `POST /inscricoes` automático. Não há coluna nova em `inscricoes`.
+
+## 5. Ondas
+
+### Onda 0 — Diagnóstico
+
+Este apêndice. Nenhum código de produção.
+
+### Onda 1 — Interpretar o JSON
+
+Função pura, em `apps/web`, que recebe `unknown`, monta uma `Ficha` só com códigos que `ficha.ts` já lista, e chama `validarFicha`. JSON quebrado, código desconhecido ou campo a mais não vira ficha silenciosa: volta motivo de leitura. Não chama Ollama.
+
+Teste: spec puro, no mesmo espírito de `processar-validacao.spec.ts`, sem Docker. O `npm test` da raiz precisa executá-lo. Isso pode exigir script de teste em `@victory/web`. Não se edita `.github/workflows/ci.yml` por causa disso.
+
+Decisão aplicada: `interpretarSugestao` em `apps/web/src/interpretar-sugestao.ts`. Campo a mais ou código ausente de `ficha.ts` devolve `ficha: null` e um motivo de leitura, sem chamar a regra. Ficha bem formada, mesmo ilegal, segue para `validarFicha`. `@victory/web` ganhou script `test`. O workflow não mudou.
+
+### Onda 2 — Ollama no Compose
+
+Serviço Ollama na rede do Compose. Volume só para o cache do modelo, para um recreate não baixar de novo. `OLLAMA_URL` no serviço web. Sem a variável, o resto do app sobe como hoje.
+
+Pendência fechada nesta onda: a tag do modelo, depois de um pull que responda JSON. A CI não sobe esse serviço.
+
+Decisão aplicada: serviço `ollama` com a imagem `ollama/ollama:0.35.1`, volume nomeado `ollama` em `/root/.ollama` e `OLLAMA_NO_CLOUD=1`. O web recebe `OLLAMA_URL=http://ollama:11434` e `OLLAMA_MODEL=qwen2.5:1.5b`, sem `depends_on` nesse serviço. A porta `11434` fica no host para o Next local, no mesmo papel das outras portas já publicadas. O pull de `qwen2.5:1.5b` respondeu `{"ok": true}`. Sem essas variáveis, o web continua subindo: nada no código as exige ainda. `.github/workflows/ci.yml` não mudou.
+
+### Onda 3 — Rota de sugestão
+
+`POST /api/sugestao` no Next. Lê a sessão, chama o Ollama pedindo JSON no formato de `Ficha`, passa o corpo na função da onda 1. Se `motivos` não estiver vazio, uma segunda chamada leva esses motivos. Não há terceira. A resposta é a da seção 4.
+
+O pedido ao modelo lista os códigos de `PERICIAS`, `Vantagem` e `Desvantagem`. Não cola texto de livreto.
+
+Decisão aplicada: `POST /api/sugestao` em `apps/web/src/app/api/sugestao/route.ts`. Sem cookie utilizável, 401 e limpeza de `sessao` e `pkce`. A descrição vai aparada, com teto de 2000 caracteres; fora disso, 400. `sugerirFicha` chama o modelo, passa o JSON em `interpretarSugestao` e, se houver motivos, faz uma segunda chamada com esses motivos. Não há terceira. Ficha bem formada responde 200, mesmo ilegal. Duas leituras sem ficha respondem 422 com os motivos, sem ficha inventada. Modelo ausente, fora ou resposta sem o JSON do chat: 502 genérico. A rota não chama o Nest nem grava inscrição. O spec não sobe Docker.
+
+### Onda 4 — Formulário
+
+Em `/fichas/nova`, um campo de descrição e um botão de sugerir. Enquanto espera, o botão não dispara de novo. A ficha devolvida preenche os campos que o formulário já tem. Motivos aparecem no alerta que `validarFicha` já usa. A pessoa ainda confirma o envio. Ficha ilegal continua podendo ser enviada, para o worker recusar.
+
+Decisão aplicada: o campo Descrição e o botão Sugerir ficam em `formulario-ficha.tsx`. O botão fica desligado enquanto a resposta não volta, e o envio também espera essa resposta para não gravar a ficha antiga no meio do caminho. `camposDaFicha` copia a ficha para os controles que já existem. O formulário tem um ataque, uma defesa, um alcance, uma maestria e um código; o primeiro de cada um entra, e graus não têm campo. Nome e conceito não são preenchidos pela sugestão. 422 mostra os motivos no mesmo alerta. 200 deixa `validarFicha` falar desse estado. Ficha ilegal segue com o botão Enviar.
+
+### Onda 5 — Prova
+
+`npm run lint`, `npm run typecheck`, `npm test`. Sem job novo e sem framework de browser. Se o Compose estiver no ar, uma descrição curta devolve ficha no formulário e não cria linha em `inscricoes` até o envio.
+
+Decisão aplicada: na raiz, os três comandos terminaram com código 0. A suíte foi 7 testes em `@victory/rules`, 5 em `@victory/api` e 16 em `@victory/web`. `.github/workflows/ci.yml` não foi editado. Keycloak e Ollama estavam no ar; web, API, Postgres e Redis não. A descrição no formulário e a contagem de `inscricoes` ficaram fora desta execução.
+
+## 6. Acompanhamento
+
+| Onda | Entrega | Status |
+|------|---------|--------|
+| 0 | Diagnóstico e contrato | Concluído |
+| 1 | Função pura e teste sem modelo | Concluído |
+| 2 | Ollama no Compose e tag do modelo | Concluído |
+| 3 | `POST /api/sugestao` | Concluído |
+| 4 | Campo e botão em `/fichas/nova` | Concluído |
+| 5 | Lint, typecheck, test | Concluído |
+
+## 7. Fora deste plano
+
+- Provedor pago ou cota de nuvem.
+- A sugestão gravar `submetida` sozinha.
+- Mudar o pool, os pares ou o texto dos motivos de `validarFicha`.
+- Streaming da resposta.
+- Guardar o texto descritivo no Postgres.
+
+## 8. Ordem
+
+0, depois 1, depois 2, depois 3, depois 4, depois 5. A onda 4 não começa sem a rota. A onda 3 não começa sem o interpretador e sem a URL do Ollama.
