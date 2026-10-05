@@ -30,6 +30,7 @@ import {
   ROTULO_PERICIA,
   ROTULO_VANTAGEM,
 } from "../../../../tema/rotulos";
+import { camposDaFicha } from "../../../../campos-da-ficha";
 
 const VANTAGENS_SIMPLES = [
   "agil",
@@ -58,6 +59,7 @@ const CODIGOS: Codigo[] = ["cacador", "combate", "derrota", "herois"];
 export function FormularioFicha() {
   const [nome, setNome] = useState("");
   const [conceito, setConceito] = useState("");
+  const [descricao, setDescricao] = useState("");
   const [poder, setPoder] = useState(1);
   const [habilidade, setHabilidade] = useState(1);
   const [resistencia, setResistencia] = useState(1);
@@ -75,7 +77,9 @@ export function FormularioFicha() {
   const [codigo, setCodigo] = useState(false);
   const [qualCodigo, setQualCodigo] = useState<Codigo>("cacador");
   const [resposta, setResposta] = useState("");
+  const [motivosLeitura, setMotivosLeitura] = useState<string[] | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [sugerindo, setSugerindo] = useState(false);
   const router = useRouter();
 
   const ficha = useMemo<Ficha>(() => {
@@ -151,8 +155,74 @@ export function FormularioFicha() {
     return marcar ? [...atual, valor] : atual.filter((item) => item !== valor);
   }
 
+  function aplicar(recebida: Ficha) {
+    const campos = camposDaFicha(recebida);
+    setPoder(campos.poder);
+    setHabilidade(campos.habilidade);
+    setResistencia(campos.resistencia);
+    setPericias(campos.pericias);
+    setSimples(campos.simples);
+    setAtaque(campos.ataque);
+    setEfeitoAtaque(campos.efeitoAtaque);
+    setDefesa(campos.defesa);
+    setEfeitoDefesa(campos.efeitoDefesa);
+    setAlcance(campos.alcance);
+    setPontosAlcance(campos.pontosAlcance);
+    setMaestria(campos.maestria);
+    setPericiaMaestria(campos.periciaMaestria);
+    setDesvantagens(campos.desvantagens);
+    setCodigo(campos.codigo);
+    setQualCodigo(campos.qualCodigo);
+  }
+
+  async function sugerir() {
+    if (sugerindo) {
+      return;
+    }
+    setSugerindo(true);
+    setResposta("");
+    setMotivosLeitura(null);
+    try {
+      const http = await fetch("/api/sugestao", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ descricao }),
+      });
+      if (http.status === 401) {
+        window.location.assign("/api/sessao/login");
+        return;
+      }
+      const json = (await http.json()) as { ficha?: Ficha; motivos?: unknown; mensagem?: unknown };
+      if (http.ok && json.ficha) {
+        aplicar(json.ficha);
+        return;
+      }
+      const motivos = Array.isArray(json.motivos) ? json.motivos.filter((item): item is string => typeof item === "string") : [];
+      if (http.status === 422 && motivos.length > 0) {
+        setMotivosLeitura(motivos);
+        return;
+      }
+      setResposta(typeof json.mensagem === "string" ? json.mensagem : `Erro ${http.status}`);
+    } catch {
+      setResposta("A sugestão não está disponível.");
+    } finally {
+      setSugerindo(false);
+    }
+  }
+
+  const textoAlerta = motivosLeitura ? motivosLeitura.join(" ") : calculo.ok ? `Pontos restantes: ${restantes}` : calculo.motivos.join(" ");
+
   return (
-    <Stack component="form" spacing={2.5} onSubmit={enviar}>
+    <Stack
+      component="form"
+      spacing={2.5}
+      onSubmit={enviar}
+      onChange={() => {
+        if (motivosLeitura) {
+          setMotivosLeitura(null);
+        }
+      }}
+    >
       <TextField label="Nome" value={nome} onChange={(evento) => setNome(evento.target.value)} required fullWidth />
       <TextField
         label="Conceito"
@@ -161,6 +231,26 @@ export function FormularioFicha() {
         required
         fullWidth
       />
+      <TextField
+        label="Descrição"
+        value={descricao}
+        onChange={(evento) => setDescricao(evento.target.value)}
+        multiline
+        minRows={3}
+        fullWidth
+        slotProps={{ htmlInput: { maxLength: 2000 } }}
+      />
+      <Box>
+        <Button
+          type="button"
+          variant="outlined"
+          disabled={sugerindo || enviando}
+          onClick={sugerir}
+          sx={{ width: { xs: "100%", sm: "auto" } }}
+        >
+          {sugerindo ? "Sugerindo…" : "Sugerir"}
+        </Button>
+      </Box>
       <Secao titulo="Atributos">
         <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" } }}>
           <Numero rotulo="Poder" valor={poder} aoMudar={setPoder} />
@@ -322,12 +412,12 @@ export function FormularioFicha() {
           />
         </Box>
       </Secao>
-      <Alert severity={calculo.ok ? "success" : "warning"} role="status">
-        {calculo.ok ? `Pontos restantes: ${restantes}` : calculo.motivos.join(" ")}
+      <Alert severity={!motivosLeitura && calculo.ok ? "success" : "warning"} role="status">
+        {textoAlerta}
       </Alert>
       {resposta ? <Alert severity="error">{resposta}</Alert> : null}
       <Box>
-        <Button type="submit" variant="contained" disabled={enviando} sx={{ width: { xs: "100%", sm: "auto" } }}>
+        <Button type="submit" variant="contained" disabled={enviando || sugerindo} sx={{ width: { xs: "100%", sm: "auto" } }}>
           {enviando ? "Enviando…" : "Enviar"}
         </Button>
       </Box>
