@@ -1059,4 +1059,4 @@ No browser, com o Next na máquina e o Keycloak no ar, uma descrição foi ao mo
 
 # 6. Próximo passo
 
-Este registro entra no mesmo incremento. O próximo passo é o pull request de `feature/sugestao-de-ficha` para `development`, por squash. `main` só recebe o conjunto numa release, com merge commit, tag anotada e a volta para `development`.
+Este registro entra no mesmo incremento. O pull request https://github.com/henryavgiarola/victory-3det/pull/26 leva `feature/sugestao-de-ficha` para `development` por squash. `main` recebe o conjunto na release `0.6.0`, com merge commit, tag anotada `v0.6.0` e a volta para `development`.
